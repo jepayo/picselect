@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Organizador por franjas</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- EXIF parser -->
+  <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
+  <!-- HEIC/HEIF → JPEG (solo para previsualizar; no persiste) -->
+  <script src="https://unpkg.com/heic2any/dist/heic2any.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Organizador por franjas</h1>
+    <div class="controls">
+      <label>Ventana (min):
+        <input id="minutes" type="number" value="5" min="1" step="1">
+      </label>
+
+      <button id="pickDir" type="button">Abrir carpeta</button>
+      <label class="filepick">o elegir archivos
+        <input id="pickFiles" type="file" accept="image/*,.heic,.heif" multiple />
+      </label>
+
+      <button id="exportSel" disabled type="button" title="Exporta nombres de marcados 🗑">Exportar selección</button>
+      <button id="moveTrash" disabled type="button" title="Mover marcados 🗑 a ./trash (requiere abrir carpeta)">Mover a /trash</button>
+      <button id="moveIdeas" disabled type="button" title="Mover marcados 💡 a ./ideas (requiere abrir carpeta)">Mover a /ideas</button>
+
+      <!-- Interruptor mostrar/ocultar gestionadas -->
+      <label class="toggle-managed" title="Mostrar/ocultar fotos ya gestionadas (en /trash o /ideas)">
+        <input id="toggleManaged" type="checkbox" checked />
+        <span>Mostrar gestionadas (trash/ideas)</span>
+      </label>
+    </div>
+
+    <!-- CONTADORES -->
+    <div class="counters" aria-live="polite">
+      <span class="badge pending" id="countPending" title="Pendientes (ni ⭐, ni 🗑, ni 💡)">Pendientes: 0</span>
+      <span class="badge star" id="countStar" title="Favoritas">⭐ 0</span>
+      <span class="badge idea" id="countIdea" title="Ideas (nuevas) 💡">💡 0</span>
+      <span class="badge trash" id="countTrash" title="En papelera (nuevas) 🗑">🗑 0</span>
+      <span class="badge total" id="countTotal" title="Total de fotos cargadas">Total: 0</span>
+    </div>
+
+    <div id="progress" class="progress" aria-live="polite"></div>
+
+    <nav class="pager" aria-label="Paginación de buckets">
+      <button id="firstPage" disabled title="Primera">⏮</button>
+      <button id="prevPage" disabled title="Anterior">◀</button>
+      <span>Página</span>
+      <input id="pageInput" type="number" min="1" value="1" disabled aria-label="Número de página">
+      <span id="pageTotal">/ 0</span>
+      <button id="nextPage" disabled title="Siguiente">▶</button>
+      <button id="lastPage" disabled title="Última">⏭</button>
+      <span class="pager-note">3 buckets por página</span>
+    </nav>
+  </header>
+
+  <main id="groups"></main>
+
+  <!-- Bucket -->
+  <template id="groupTpl">
+    <section class="group" data-abs-index="">
+      <div class="ghead ghit" role="button" tabindex="0" title="Entrar en bucket (Espacio o clic)">
+        <h2 class="gtitle"></h2>
+      </div>
+      <div class="grid"></div>
+    </section>
+  </template>
+
+  <template id="itemTpl">
+    <figure class="item">
+      <img loading="lazy" />
+      <figcaption class="caption"></figcaption>
+
+      <!-- PAPELERA -->
+      <button class="mark btn-trash" type="button" aria-pressed="false" title="Marcar para borrar">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 6h18M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2M19 6l-1 13a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m4 4v8m6-8v8"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <!-- IDEAS -->
+      <button class="mark btn-idea" type="button" aria-pressed="false" title="Marcar como idea">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 21h6m-7-3h8a5 5 0 00.9-2.8c0-1.2.6-2.2 1.4-3a7 7 0 10-11.7 0c.8.8 1.4 1.8 1.4 3 0 1 .3 1.9.9 2.8z"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <!-- ESTRELLA -->
+      <button class="mark btn-star" type="button" aria-pressed="false" title="Marcar como favorita">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                fill="currentColor"/>
+        </svg>
+      </button>
+    </figure>
+  </template>
+
+  <!-- Overlay -->
+  <div id="bucketOverlay" class="overlay" hidden aria-hidden="true" aria-label="Detalle de bucket">
+    <header class="overlay-header">
+      <div class="overlay-left">
+        <button id="closeOverlay" class="overlay-close" type="button" title="Volver (Esc)">← Volver</button>
+      </div>
+      <div class="overlay-mid">
+        <h2 id="overlayTitle"></h2>
+        <div id="overlayMeta" class="overlay-meta"></div>
+        <div class="overlay-help">Atajos: Espacio pantalla completa · ← → ↑ ↓ mover · Z estrella · X papelera · I ideas · R papelera a no ⭐ · Esc volver</div>
+      </div>
+      <div class="overlay-right">
+        <button id="overlayPrev" class="overlay-nav" type="button" title="Bucket anterior">◀</button>
+        <button id="overlayNext" class="overlay-nav" type="button" title="Bucket siguiente">▶</button>
+      </div>
+    </header>
+    <section id="overlayGrid" class="overlay-grid" tabindex="0"></section>
+  </div>
+
+  <!-- Visor pantalla completa -->
+  <div id="photoViewer" class="viewer" hidden aria-hidden="true">
+    <img id="viewerImg" alt="" />
+    <div id="viewerCaption" class="viewer-caption"></div>
+    <button id="viewerTrash" class="viewer-btn btn-trash" type="button" aria-pressed="false" title="Marcar para borrar (X)">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 6h18M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2M19 6l-1 13a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m4 4v8m6-8v8"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <button id="viewerIdea" class="viewer-btn btn-idea" type="button" aria-pressed="false" title="Marcar como idea (I)">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 21h6m-7-3h8a5 5 0 00.9-2.8c0-1.2.6-2.2 1.4-3a7 7 0 10-11.7 0c.8.8 1.4 1.8 1.4 3 0 1 .3 1.9.9 2.8z"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <button id="viewerStar" class="viewer-btn btn-star" type="button" aria-pressed="false" title="Marcar como favorita (Z)">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+              fill="currentColor"/>
+      </svg>
+    </button>
+    <div class="viewer-help">Espacio: volver · ←/→: cambiar · Z: estrella · X: papelera · I: ideas · R: papelera a no ⭐</div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
