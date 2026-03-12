@@ -200,7 +200,7 @@ async function scanDir(dirHandle, relPrefix = '', managed = null) {
 
 async function loadFromDirectory() {
   if (!('showDirectoryPicker' in window)) {
-    alert('Tu navegador no soporta abrir carpetas. Usa “elegir archivos”.');
+    alert('Tu navegador no soporta abrir carpetas. Usa "elegir archivos".');
     return;
   }
   const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
@@ -272,7 +272,8 @@ function resetState(clearRoot = true) {
 }
 
 function buildGroups() {
-  const sorted = [...allItems].sort((a,b)=> a.ts - b.ts);
+  const source = showManaged ? allItems : allItems.filter(it => !isManaged(it));
+  const sorted = [...source].sort((a,b)=> a.ts - b.ts);
   const win = msPerBucket();
   groups = [];
   if (sorted.length === 0) return;
@@ -711,7 +712,7 @@ async function moveOne(it, targetDir) {
 
 async function moveMarkedTo(folderName, set) {
   if (!hasWriteSupport()) {
-    alert(`Para mover archivos necesitas abrir una CARPETA con “Abrir carpeta”.`);
+    alert(`Para mover archivos necesitas abrir una CARPETA con "Abrir carpeta".`);
     return;
   }
   const movable = [];
@@ -720,7 +721,7 @@ async function moveMarkedTo(folderName, set) {
     if (it?.dirHandle && it?.fileHandle && !isManaged(it)) movable.push(it);
   }
   if (movable.length === 0) {
-    alert('No hay elementos marcados con permisos de escritura (o ya están gestionados). Usa “Abrir carpeta”.');
+    alert('No hay elementos marcados con permisos de escritura (o ya están gestionados). Usa "Abrir carpeta".');
     return;
   }
 
@@ -785,7 +786,10 @@ moveIdeasBtn.addEventListener('click', moveMarkedToIdeas);
 
 toggleManagedInput.addEventListener('change', () => {
   showManaged = !!toggleManagedInput.checked;
-  // Refrescar lista
+  // Regenerar buckets respetando el filtro y refrescar
+  buildGroups();
+  currentPage = Math.min(currentPage, totalPages());
+  updatePagerState();
   renderPage(currentPage);
   updateListSelectionUI();
   // Si el overlay estaba abierto, refrescarlo
