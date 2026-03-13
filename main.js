@@ -6,6 +6,7 @@ const minutesInput = document.getElementById('minutes');
 const exportBtn = document.getElementById('exportSel');
 const moveBtn = document.getElementById('moveTrash');
 const moveIdeasBtn = document.getElementById('moveIdeas');
+const moveSelectedBtn = document.getElementById('moveSelected');
 const toggleManagedInput = document.getElementById('toggleManaged');
 // Contadores
 const countPendingEl = document.getElementById('countPending');
@@ -81,7 +82,7 @@ function fmtSpan(startMs, endMs) {
   return sameDay ? `${d} · ${s} – ${e}` : `${start.toLocaleString()} – ${end.toLocaleString()}`;
 }
 function keyFor(it){ return `${it.name}|${it.size}|${it.ts}`; }
-function isManaged(it){ return it?.managed === 'trash' || it?.managed === 'ideas'; }
+function isManaged(it){ return it?.managed === 'trash' || it?.managed === 'ideas' || it?.managed === 'selected'; }
 function visibleItemsForBucket(absIndex){
   const g = groups[absIndex];
   if (!g) return [];
@@ -183,7 +184,7 @@ async function scanDir(dirHandle, relPrefix = '', managed = null) {
   for await (const [name, h] of dirHandle.entries()) {
     if (h.kind === 'directory') {
       const lname = name.toLowerCase();
-      const nextManaged = managed ?? (lname === 'trash' ? 'trash' : lname === 'ideas' ? 'ideas' : null);
+      const nextManaged = managed ?? (lname === 'trash' ? 'trash' : lname === 'ideas' ? 'ideas' : lname === 'selected' ? 'selected' : null);
       const sub = await scanDir(h, relPrefix + name + '/', nextManaged);
       entries.push(...sub);
     } else if (h.kind === 'file') {
@@ -262,7 +263,7 @@ function resetState(clearRoot = true) {
   currentPage = 1;
   listMode = 'bucket'; selBucketAbsIndex = 0; selPhotoIndex = 0;
   currentOverlayIndex = null; overlaySelIdx = 0; lastOpenAbsIndex = null; overlayEdgeIntent = null;
-  exportBtn.disabled = true; moveBtn.disabled = true; moveIdeasBtn.disabled = true;
+  exportBtn.disabled = true; moveBtn.disabled = true; moveIdeasBtn.disabled = true; moveSelectedBtn.disabled = true;
   if (clearRoot) rootDirHandle = null;
   groupsEl.textContent = '';
   pageInput.disabled = true;
@@ -321,7 +322,7 @@ function revokeOverlayURLs() {
 function applyItemClasses(fig, it){
   fig.classList.toggle('locked', isManaged(it));
   if (isManaged(it)) {
-    fig.dataset.locked = (it.managed === 'trash' ? 'TRASH' : 'IDEAS');
+    fig.dataset.locked = (it.managed === 'trash' ? 'TRASH' : it.managed === 'ideas' ? 'IDEAS' : 'SELECTED');
     fig.classList.remove('trashed', 'starred', 'idea');
     return;
   }
@@ -677,6 +678,7 @@ function updateActionButtons() {
   exportBtn.disabled = trashSet.size === 0;
   moveBtn.disabled = !(hasWriteSupport() && countMovable(trashSet) > 0);
   moveIdeasBtn.disabled = !(hasWriteSupport() && countMovable(ideaSet) > 0);
+  moveSelectedBtn.disabled = !(hasWriteSupport() && countMovable(starSet) > 0);
 }
 
 async function ensureUniqueName(dirHandle, name) {
@@ -747,7 +749,7 @@ async function moveMarkedTo(folderName, set) {
       it.fileHandle = dstHandle;
       it.dirHandle = targetDir;
       it.relPath = `${folderName}/${dstName}`;
-      it.managed = (folderName === 'trash') ? 'trash' : 'ideas';
+      it.managed = (folderName === 'trash') ? 'trash' : (folderName === 'ideas') ? 'ideas' : 'selected';
 
       itemByKey.delete(oldKey);
       const newKey = keyFor(it);
@@ -775,6 +777,7 @@ async function moveMarkedTo(folderName, set) {
 
 async function moveMarkedToTrash() { return moveMarkedTo('trash', trashSet); }
 async function moveMarkedToIdeas() { return moveMarkedTo('ideas', ideaSet); }
+async function moveMarkedToSelected() { return moveMarkedTo('selected', starSet); }
 
 /* ---------- Eventos UI ---------- */
 pickDirBtn.addEventListener('click', loadFromDirectory);
@@ -783,6 +786,7 @@ minutesInput.addEventListener('change', reBucketOnWindowChange);
 exportBtn.addEventListener('click', exportSelection);
 moveBtn.addEventListener('click', moveMarkedToTrash);
 moveIdeasBtn.addEventListener('click', moveMarkedToIdeas);
+moveSelectedBtn.addEventListener('click', moveMarkedToSelected);
 
 toggleManagedInput.addEventListener('change', () => {
   showManaged = !!toggleManagedInput.checked;
@@ -891,6 +895,25 @@ document.addEventListener('keydown', (e) => {
         updateCountersUI();
       }
       break;
+    case 'p': case 'P':
+      if (vis.length) {
+        e.preventDefault();
+        vis.forEach((it, idx) => {
+          if (isManaged(it)) return;
+          const key = keyFor(it);
+          if (!trashSet.has(key) && !ideaSet.has(key) && !starSet.has(key)) {
+            starSet.add(key); trashSet.delete(key); ideaSet.delete(key);
+            const grid = getBucketGrid(selBucketAbsIndex);
+            const fig = grid?.children[idx];
+            const node = (fig?.classList?.contains('item')) ? fig : fig?.querySelector('.item');
+            if (node) applyItemClasses(node, it);
+          }
+        });
+        updateActionButtons();
+        updateListSelectionUI(true);
+        updateCountersUI();
+      }
+      break;
   }
 });
 
@@ -971,6 +994,23 @@ function overlayKeydown(e) {
         const key = keyFor(it);
         if (!starSet.has(key)) {
           trashSet.add(key); starSet.delete(key); ideaSet.delete(key);
+          const fig = overlayGrid.children[idx];
+          if (fig) applyItemClasses(fig, it);
+        }
+      });
+      updateActionButtons();
+      overlayEdgeIntent = null;
+      updateViewerButtonsState();
+      updateCountersUI();
+      break;
+    }
+    case 'p': case 'P': {
+      e.preventDefault();
+      vis.forEach((it, idx) => {
+        if (isManaged(it)) return;
+        const key = keyFor(it);
+        if (!trashSet.has(key) && !ideaSet.has(key) && !starSet.has(key)) {
+          starSet.add(key); trashSet.delete(key); ideaSet.delete(key);
           const fig = overlayGrid.children[idx];
           if (fig) applyItemClasses(fig, it);
         }
