@@ -1,7 +1,6 @@
 /* ---------- DOM refs ---------- */
 const groupsEl = document.getElementById('groups');
 const pickDirBtn = document.getElementById('pickDir');
-const pickFilesInput = document.getElementById('pickFiles');
 const minutesInput = document.getElementById('minutes');
 const moveBtn = document.getElementById('moveTrash');
 const moveIdeasBtn = document.getElementById('moveIdeas');
@@ -766,7 +765,6 @@ async function moveMarkedToSelected() { return moveMarkedTo('selected', starSet)
 
 /* ---------- Eventos UI ---------- */
 pickDirBtn.addEventListener('click', loadFromDirectory);
-pickFilesInput.addEventListener('change', (e)=> loadFiles(e.target.files));
 minutesInput.addEventListener('change', reBucketOnWindowChange);
 moveBtn.addEventListener('click', moveMarkedToTrash);
 moveIdeasBtn.addEventListener('click', moveMarkedToIdeas);
