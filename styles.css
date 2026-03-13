@@ -7,6 +7,27 @@ h1 { margin: 0 0 8px; font-size: 20px; }
 /* Controls */
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .filepick input[type=file] { display: inline-block; }
+
+/* Botones de acción principales */
+.controls button, .controls label.filepick {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  border: 1.5px solid transparent; cursor: pointer;
+  transition: filter .15s ease, transform .08s ease, box-shadow .15s ease;
+  white-space: nowrap;
+}
+.controls button:hover:not(:disabled), .controls label.filepick:hover {
+  filter: brightness(.93); transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
+}
+.controls button:active:not(:disabled) { transform: translateY(0); filter: brightness(.87); }
+.controls button:disabled { opacity: .45; cursor: not-allowed; }
+
+#pickDir    { background: #1a73e8; color: #fff; border-color: #1558b0; }
+.filepick   { background: #f1f3f4; color: #444; border-color: #dadce0; font-weight: 600; font-size: 13px; }
+#moveTrash  { background: #ffefef; color: #c62828; border-color: #f5b5b5; }
+#moveIdeas  { background: #e9f9ef; color: #1b7f3a; border-color: #bfe8cc; }
+#moveSelected { background: #fff8e1; color: #8a6a00; border-color: #f7d27a; }
 .toggle-managed { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #333; }
 .toggle-managed input { transform: translateY(1px); }
 
@@ -177,6 +198,6 @@ h1 { margin: 0 0 8px; font-size: 20px; }
 #viewerIdea[aria-pressed="true"]  { background: #e9f9ef; border-color: #bfe8cc; color: #1b7f3a; }
 
 /* -------- VISOR: fondos sólidos según estado -------- */
-.viewer.viewer-starred { background: #463c06; } /* “golden” */
+.viewer.viewer-starred { background: #463c06; } /* "golden" */
 .viewer.viewer-trashed { background: #5a0404; } /* rojo */
 .viewer.viewer-idea    { background: #0f2e0f; } /* verdoso */
