@@ -6,6 +6,10 @@ const moveBtn = document.getElementById('moveTrash');
 const moveIdeasBtn = document.getElementById('moveIdeas');
 const moveSelectedBtn = document.getElementById('moveSelected');
 const toggleManagedInput = document.getElementById('toggleManaged');
+const toggleTrack = toggleManagedInput?.nextElementSibling;
+function syncToggleTrack() {
+  toggleTrack?.classList.toggle('is-on', toggleManagedInput.checked);
+}
 // Contadores
 const countPendingEl = document.getElementById('countPending');
 const countStarEl    = document.getElementById('countStar');
@@ -224,29 +228,6 @@ async function loadEntriesWithHandles(entries) {
     i++;
     if (i % 25 === 0 || i === entries.length) {
       progressEl.textContent = `Leyendo metadatos… ${i} / ${entries.length}`;
-    }
-  }
-  buildGroups(); currentPage = 1; updatePagerState(); renderPage(currentPage);
-  progressEl.textContent = `Listo: ${allItems.length} fotos → ${groups.length} buckets`;
-  listMode = 'bucket'; selBucketAbsIndex = 0; selPhotoIndex = 0;
-  updateListSelectionUI(); updateActionButtons(); updateCountersUI();
-}
-
-async function loadFiles(fileList) {
-  rootDirHandle = null;
-  resetState();
-  const files = Array.from(fileList);
-  files.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
-  progressEl.textContent = `Leyendo metadatos… 0 / ${files.length}`;
-  let i = 0;
-  for (const file of files) {
-    const ts = await getTimestamp(file);
-    const item = { file, name: file.name, size: file.size || 0, ts, managed: null };
-    allItems.push(item);
-    itemByKey.set(keyFor(item), item);
-    i++;
-    if (i % 25 === 0 || i === files.length) {
-      progressEl.textContent = `Leyendo metadatos… ${i} / ${files.length}`;
     }
   }
   buildGroups(); currentPage = 1; updatePagerState(); renderPage(currentPage);
@@ -768,10 +749,11 @@ pickDirBtn.addEventListener('click', loadFromDirectory);
 minutesInput.addEventListener('change', reBucketOnWindowChange);
 moveBtn.addEventListener('click', moveMarkedToTrash);
 moveIdeasBtn.addEventListener('click', moveMarkedToIdeas);
-moveSelectedBtn.addEventListener('click', moveMarkedToSelected);
+if (moveSelectedBtn) moveSelectedBtn.addEventListener('click', moveMarkedToSelected);
 
 toggleManagedInput.addEventListener('change', () => {
   showManaged = !!toggleManagedInput.checked;
+  syncToggleTrack();
   // Regenerar buckets respetando el filtro y refrescar
   buildGroups();
   currentPage = Math.min(currentPage, totalPages());
@@ -1100,6 +1082,7 @@ renderPage(currentPage);
 updateListSelectionUI();
 updateActionButtons();
 updateCountersUI();
+syncToggleTrack();
 
 /* utilidades consola */
 Object.assign(window, { allItems, groups, openBucket, moveMarkedToTrash, moveMarkedToIdeas });
