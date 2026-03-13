@@ -6,7 +6,7 @@ const moveBtn = document.getElementById('moveTrash');
 const moveIdeasBtn = document.getElementById('moveIdeas');
 const moveSelectedBtn = document.getElementById('moveSelected');
 const toggleManagedInput = document.getElementById('toggleManaged');
-const toggleTrack = toggleManagedInput?.nextElementSibling;
+const toggleTrack = document.querySelector('.toggle-track');
 function syncToggleTrack() {
   toggleTrack?.classList.toggle('is-on', toggleManagedInput.checked);
 }
