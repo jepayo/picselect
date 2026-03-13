@@ -3,7 +3,6 @@ const groupsEl = document.getElementById('groups');
 const pickDirBtn = document.getElementById('pickDir');
 const pickFilesInput = document.getElementById('pickFiles');
 const minutesInput = document.getElementById('minutes');
-const exportBtn = document.getElementById('exportSel');
 const moveBtn = document.getElementById('moveTrash');
 const moveIdeasBtn = document.getElementById('moveIdeas');
 const moveSelectedBtn = document.getElementById('moveSelected');
@@ -263,7 +262,7 @@ function resetState(clearRoot = true) {
   currentPage = 1;
   listMode = 'bucket'; selBucketAbsIndex = 0; selPhotoIndex = 0;
   currentOverlayIndex = null; overlaySelIdx = 0; lastOpenAbsIndex = null; overlayEdgeIntent = null;
-  exportBtn.disabled = true; moveBtn.disabled = true; moveIdeasBtn.disabled = true; moveSelectedBtn.disabled = true;
+  moveBtn.disabled = true; moveIdeasBtn.disabled = true; moveSelectedBtn.disabled = true;
   if (clearRoot) rootDirHandle = null;
   groupsEl.textContent = '';
   pageInput.disabled = true;
@@ -596,19 +595,6 @@ function renderOverlay() {
   if (vis.length > 0) setOverlaySelected(Math.min(overlaySelIdx, vis.length - 1));
 }
 
-/* ---------- Export TXT (trash) ---------- */
-async function exportSelection() {
-  if (trashSet.size === 0) return;
-  const items = [...allItems].sort((a,b)=>a.ts-b.ts);
-  const lines = [];
-  for (const it of items) {
-    const key = keyFor(it);
-    if (!isManaged(it) && trashSet.has(key)) lines.push(it.relPath || it.name);
-  }
-  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'seleccion_trash.txt'; a.click();
-}
-
 /* ---------- Viewer ---------- */
 function isViewerOpen(){ return !viewer.hidden; }
 function openViewer() { updateViewerImage(); viewer.hidden = false; viewer.setAttribute('aria-hidden', 'false'); updateViewerButtonsState(); }
@@ -675,7 +661,6 @@ function countMovable(set){
   return n;
 }
 function updateActionButtons() {
-  exportBtn.disabled = trashSet.size === 0;
   moveBtn.disabled = !(hasWriteSupport() && countMovable(trashSet) > 0);
   moveIdeasBtn.disabled = !(hasWriteSupport() && countMovable(ideaSet) > 0);
   moveSelectedBtn.disabled = !(hasWriteSupport() && countMovable(starSet) > 0);
@@ -783,7 +768,6 @@ async function moveMarkedToSelected() { return moveMarkedTo('selected', starSet)
 pickDirBtn.addEventListener('click', loadFromDirectory);
 pickFilesInput.addEventListener('change', (e)=> loadFiles(e.target.files));
 minutesInput.addEventListener('change', reBucketOnWindowChange);
-exportBtn.addEventListener('click', exportSelection);
 moveBtn.addEventListener('click', moveMarkedToTrash);
 moveIdeasBtn.addEventListener('click', moveMarkedToIdeas);
 moveSelectedBtn.addEventListener('click', moveMarkedToSelected);
