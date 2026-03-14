@@ -14,22 +14,17 @@
   <header>
     <h1>Organizador por franjas</h1>
     <div class="controls">
-      <label>Ventana (min):
-        <input id="minutes" type="number" value="5" min="1" step="1">
-      </label>
-
       <button id="pickDir" type="button">📁 Abrir carpeta</button>
+      <button class="btn-mins" data-mins="2">2'</button>
+      <button class="btn-mins active" data-mins="5">5'</button>
+      <button class="btn-mins" data-mins="10">10'</button>
 
       <button id="moveTrash" disabled type="button" title="Mover marcados 🗑 a ./trash (requiere abrir carpeta)">Mover a /trash</button>
       <button id="moveIdeas" disabled type="button" title="Mover marcados 💡 a ./ideas (requiere abrir carpeta)">Mover a /ideas</button>
       <button id="moveSelected" disabled type="button" title="Mover marcados ⭐ a ./selected (requiere abrir carpeta)">Mover a /selected</button>
 
       <!-- Interruptor mostrar/ocultar gestionadas -->
-      <label class="toggle-managed" title="Mostrar/ocultar fotos ya gestionadas (en /trash, /ideas o /selected)">
-        <input id="toggleManaged" type="checkbox" checked />
-        <span class="toggle-track"><span class="toggle-thumb"></span></span>
-        <span>Mostrar gestionadas</span>
-      </label>
+      <button id="toggleManaged" class="btn-toggle is-on" type="button" title="Mostrar/ocultar fotos ya gestionadas">👁 Mostrar gestionadas</button>
     </div>
 
     <!-- CONTADORES -->
