@@ -751,6 +751,7 @@ if (moveSelectedBtn) moveSelectedBtn.addEventListener('click', moveMarkedToSelec
 toggleManagedBtn.addEventListener('click', () => {
   showManaged = !showManaged;
   toggleManagedBtn.classList.toggle('is-on', showManaged);
+  console.log('showManaged:', showManaged, '| is-on:', toggleManagedBtn.classList.contains('is-on'));
   buildGroups();
   currentPage = Math.min(currentPage, totalPages());
   updatePagerState();
@@ -1097,6 +1098,7 @@ renderPage(currentPage);
 updateListSelectionUI();
 updateActionButtons();
 updateCountersUI();
+toggleManagedBtn.classList.toggle('is-on', showManaged);
 
 /* utilidades consola */
 Object.assign(window, { allItems, groups, openBucket, moveMarkedToTrash, moveMarkedToIdeas });
