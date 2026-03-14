@@ -5,11 +5,9 @@ const minutesInput = document.getElementById('minutes');
 const moveBtn = document.getElementById('moveTrash');
 const moveIdeasBtn = document.getElementById('moveIdeas');
 const moveSelectedBtn = document.getElementById('moveSelected');
-const toggleManagedInput = document.getElementById('toggleManaged');
-const toggleTrack = document.querySelector('.toggle-track');
-function syncToggleTrack() {
-  toggleTrack?.classList.toggle('is-on', toggleManagedInput.checked);
-}
+const toggleManagedBtn = document.getElementById('toggleManaged');
+const minsBtns = document.querySelectorAll('.btn-mins');
+let currentMins = 5;
 // Contadores
 const countPendingEl = document.getElementById('countPending');
 const countStarEl    = document.getElementById('countStar');
