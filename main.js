@@ -767,14 +767,24 @@ minsBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     const newMins = parseInt(btn.dataset.mins, 10);
     if (newMins === currentMins) return;
-    if (allItems.length > 0) {
-      const ok = confirm(`¿Cambiar la ventana a ${newMins} min? Se perderá toda la categorización no aplicada y se recargará la carpeta.`);
-      if (!ok) return;
-    }
     currentMins = newMins;
     minsBtns.forEach(b => b.classList.toggle('active', b === btn));
     if (rootDirHandle) {
-      scanDir(rootDirHandle).then(entries => loadEntriesWithHandles(entries));
+      // Preservar categorización actual
+      const savedTrash    = new Set(trashSet);
+      const savedStar     = new Set(starSet);
+      const savedIdea     = new Set(ideaSet);
+      scanDir(rootDirHandle).then(entries =>
+        loadEntriesWithHandles(entries).then(() => {
+          // Restaurar tags por key
+          for (const k of savedTrash) if (itemByKey.has(k)) trashSet.add(k);
+          for (const k of savedStar)  if (itemByKey.has(k)) starSet.add(k);
+          for (const k of savedIdea)  if (itemByKey.has(k)) ideaSet.add(k);
+          renderPage(currentPage);
+          updateActionButtons();
+          updateCountersUI();
+        })
+      );
     }
   });
 });
