@@ -7,7 +7,6 @@ const moveIdeasBtn = document.getElementById('moveIdeas');
 const moveSelectedBtn = document.getElementById('moveSelected');
 const toggleManagedBtn = document.getElementById('toggleManaged');
 const minsBtns = document.querySelectorAll('.btn-mins');
-let currentMins = 5;
 // Contadores
 const countPendingEl = document.getElementById('countPending');
 const countStarEl    = document.getElementById('countStar');
@@ -49,6 +48,7 @@ let starSet  = new Set();   // nuevas selecciones para star
 let ideaSet  = new Set();   // nuevas selecciones para ideas
 let currentPage = 1;
 const BUCKETS_PER_PAGE = 3;
+let currentMins = 5;
 
 let rootDirHandle = null;
 let itemByKey = new Map();
@@ -71,7 +71,7 @@ let overlayEdgeIntent = null;
 let showManaged = true;
 
 /* ---------- Utilidades ---------- */
-function msPerBucket() { const m = Math.max(1, parseInt(minutesInput.value || '5', 10)); return m * 60 * 1000; }
+function msPerBucket() { return currentMins * 60 * 1000; }
 function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 function fmtSpan(startMs, endMs) {
   const start = new Date(startMs), end = new Date(endMs);
@@ -744,32 +744,39 @@ async function moveMarkedToSelected() { return moveMarkedTo('selected', starSet)
 
 /* ---------- Eventos UI ---------- */
 pickDirBtn.addEventListener('click', loadFromDirectory);
-minutesInput.addEventListener('change', reBucketOnWindowChange);
 moveBtn.addEventListener('click', moveMarkedToTrash);
 moveIdeasBtn.addEventListener('click', moveMarkedToIdeas);
 if (moveSelectedBtn) moveSelectedBtn.addEventListener('click', moveMarkedToSelected);
 
-toggleManagedInput.addEventListener('change', () => {
-  showManaged = !!toggleManagedInput.checked;
-  syncToggleTrack();
-  // Regenerar buckets respetando el filtro y refrescar
+toggleManagedBtn.addEventListener('click', () => {
+  showManaged = !showManaged;
+  toggleManagedBtn.classList.toggle('is-on', showManaged);
   buildGroups();
   currentPage = Math.min(currentPage, totalPages());
   updatePagerState();
   renderPage(currentPage);
   updateListSelectionUI();
-  // Si el overlay estaba abierto, refrescarlo
   if (!overlay.hidden && currentOverlayIndex !== null) {
     const vis = currentVisibleOverlayItems();
-    if (vis.length === 0) { // el bucket visible se ha quedado vacío
-      // mantenemos el overlay abierto mostrando 0 elementos
-      overlaySelIdx = 0;
-      renderOverlay();
-    } else {
-      overlaySelIdx = Math.min(overlaySelIdx, vis.length - 1);
-      renderOverlay();
-    }
+    overlaySelIdx = Math.min(overlaySelIdx, Math.max(0, vis.length - 1));
+    renderOverlay();
   }
+});
+
+minsBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const newMins = parseInt(btn.dataset.mins, 10);
+    if (newMins === currentMins) return;
+    if (allItems.length > 0) {
+      const ok = confirm(`¿Cambiar la ventana a ${newMins} min? Se perderá toda la categorización no aplicada y se recargará la carpeta.`);
+      if (!ok) return;
+    }
+    currentMins = newMins;
+    minsBtns.forEach(b => b.classList.toggle('active', b === btn));
+    if (rootDirHandle) {
+      scanDir(rootDirHandle).then(entries => loadEntriesWithHandles(entries));
+    }
+  });
 });
 
 firstBtn.addEventListener('click', ()=> goToPage(1));
@@ -1080,7 +1087,6 @@ renderPage(currentPage);
 updateListSelectionUI();
 updateActionButtons();
 updateCountersUI();
-syncToggleTrack();
 
 /* utilidades consola */
 Object.assign(window, { allItems, groups, openBucket, moveMarkedToTrash, moveMarkedToIdeas });
