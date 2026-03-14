@@ -7,11 +7,12 @@ const moveIdeasBtn = document.getElementById('moveIdeas');
 const moveSelectedBtn = document.getElementById('moveSelected');
 const toggleManagedBtn = document.getElementById('toggleManaged');
 const minsBtns = document.querySelectorAll('.btn-mins');
-// Contadores
-const countPendingEl = document.getElementById('countPending');
+// Contadores en botones de categoría
 const countStarEl    = document.getElementById('countStar');
 const countIdeaEl    = document.getElementById('countIdea');
 const countTrashEl   = document.getElementById('countTrash');
+// Contadores en barra inferior
+const countPendingEl = document.getElementById('countPending');
 const countTotalEl   = document.getElementById('countTotal');
 // Pager
 const firstBtn = document.getElementById('firstPage');
@@ -163,10 +164,10 @@ function computeCounts() {
 function updateCountersUI() {
   const { total, nStar, nTrash, nIdea, nPending } = computeCounts();
   countTotalEl.textContent   = `Total: ${total}`;
-  countStarEl.textContent    = `⭐ ${nStar}`;
-  countIdeaEl.textContent    = `💡 ${nIdea}`;
-  countTrashEl.textContent   = `🗑 ${nTrash}`;
   countPendingEl.textContent = `Pendientes: ${Math.max(0, nPending)}`;
+  countStarEl.textContent    = nStar;
+  countIdeaEl.textContent    = nIdea;
+  countTrashEl.textContent   = nTrash;
 }
 
 /* ---------- Carga & agrupado ---------- */
