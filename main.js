@@ -254,7 +254,19 @@ function renderPage(pageNum) {
       img.alt = it.name; cap.textContent = it.name;
       getDisplayURL(it, 'list').then(url => { img.src = url; }).catch(() => { img.alt = it.name + ' (sin preview)'; });
       applyItemClasses(fig, it);
-      if (btnRotate) btnRotate.style.display = 'none'; // oculto en lista
+      if (btnRotate) {
+        if (!isManaged(it) && isJpeg(it)) {
+          btnRotate.addEventListener('click', async e => {
+            e.stopPropagation();
+            try {
+              await rotateJpeg90cw(it);
+              const newUrl = await getDisplayURL(it, 'list');
+              img.src = ''; img.src = newUrl;
+              progressEl.textContent = `Rotada: ${it.name}`;
+            } catch (err) { progressEl.textContent = `Error al rotar: ${err.message}`; }
+          });
+        } else { btnRotate.style.display = 'none'; }
+      }
       if (!isManaged(it)) {
         const key = keyFor(it);
         btnTrash.setAttribute('aria-pressed', trashSet.has(key) + '');
