@@ -106,6 +106,7 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 .mark:active { transform: scale(0.98); }
 .mark .icon { width: 18px; height: 18px; display: block; }
 .btn-trash { top: 6px; right: 6px; }
+.btn-rotate { top: 6px; left: 6px; }
 .btn-star  { bottom: 6px; left: 6px; }
 .btn-idea  { bottom: 6px; right: 6px; }
 
