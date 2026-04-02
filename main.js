@@ -28,6 +28,7 @@ const overlayMeta  = document.getElementById('overlayMeta');
 const overlayClose = document.getElementById('closeOverlay');
 const overlayPrev  = document.getElementById('overlayPrev');
 const overlayNext  = document.getElementById('overlayNext');
+const rotateBtn    = document.getElementById('rotateBtn');
 // Viewer
 const viewer        = document.getElementById('photoViewer');
 const viewerImg     = document.getElementById('viewerImg');
@@ -483,6 +484,125 @@ function renderOverlay() {
   if (vis.length > 0) setOverlaySelected(Math.min(overlaySelIdx, vis.length - 1));
 }
 
+/* ---------- Rotación JPEG ---------- */
+function isJpeg(it) { return /\.(jpe?g)$/i.test(it.name) || it.file?.type === 'image/jpeg'; }
+
+async function rotateJpeg90cw(it) {
+  if (!it.fileHandle || !it.dirHandle) throw new Error('Sin handle de escritura');
+
+  // Leer el archivo original como ArrayBuffer
+  const srcFile = await it.fileHandle.getFile();
+  const arrayBuf = await srcFile.arrayBuffer();
+  const srcBytes = new Uint8Array(arrayBuf);
+
+  // Extraer EXIF con piexifjs (trabaja con dataURL/binary string)
+  const binStr = srcBytes.reduce((s, b) => s + String.fromCharCode(b), '');
+  let exifObj = null;
+  try { exifObj = piexif.load(binStr); } catch (_) { exifObj = {}; }
+
+  // Dibujar imagen rotada en canvas
+  const blob = new Blob([srcBytes], { type: 'image/jpeg' });
+  const url  = URL.createObjectURL(blob);
+  const img  = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = url;
+  });
+  URL.revokeObjectURL(url);
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = img.naturalHeight;
+  canvas.height = img.naturalWidth;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+
+  // Exportar como JPEG blob
+  const rotatedBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
+  const rotatedBuf  = await rotatedBlob.arrayBuffer();
+  const rotatedBytes = new Uint8Array(rotatedBuf);
+
+  // Reinyectar EXIF — corregir orientación a 1 (normal) y actualizar dimensiones
+  if (exifObj) {
+    if (exifObj['0th']) {
+      exifObj['0th'][piexif.ImageIFD.Orientation] = 1;
+      exifObj['0th'][piexif.ImageIFD.ImageWidth]  = canvas.width;
+      exifObj['0th'][piexif.ImageIFD.ImageLength] = canvas.height;
+    }
+    if (exifObj['Exif']) {
+      exifObj['Exif'][piexif.ExifIFD.PixelXDimension] = canvas.width;
+      exifObj['Exif'][piexif.ExifIFD.PixelYDimension] = canvas.height;
+    }
+    try {
+      const exifBytes = piexif.dump(exifObj);
+      const rotatedBin = rotatedBytes.reduce((s, b) => s + String.fromCharCode(b), '');
+      const withExif   = piexif.insert(exifBytes, rotatedBin);
+      const finalBytes = new Uint8Array(withExif.length);
+      for (let i = 0; i < withExif.length; i++) finalBytes[i] = withExif.charCodeAt(i);
+
+      // Escribir en disco
+      const ws = await it.fileHandle.createWritable();
+      await ws.write(finalBytes.buffer);
+      await ws.close();
+    } catch (_) {
+      // Si piexif falla, escribir sin EXIF antes de tirar el error
+      const ws = await it.fileHandle.createWritable();
+      await ws.write(rotatedBuf);
+      await ws.close();
+    }
+  } else {
+    const ws = await it.fileHandle.createWritable();
+    await ws.write(rotatedBuf);
+    await ws.close();
+  }
+
+  // Actualizar el item en memoria con el nuevo File
+  const newFile = await it.fileHandle.getFile();
+  it.file = newFile;
+  it.size = newFile.size;
+
+  // Limpiar caches de URL para esta foto
+  const key = keyFor(it);
+  const listURL = heicListURLCache.get(key);
+  if (listURL) { URL.revokeObjectURL(listURL); heicListURLCache.delete(key); }
+  const ovURL = heicOverlayURLCache.get(key);
+  if (ovURL) { URL.revokeObjectURL(ovURL); heicOverlayURLCache.delete(key); }
+}
+
+async function rotateSelected() {
+  if (currentOverlayIndex === null) return;
+  const vis = currentVisibleOverlayItems();
+  const it  = vis[overlaySelIdx];
+  if (!it || isManaged(it) || !isJpeg(it)) return;
+
+  rotateBtn.disabled = true;
+  rotateBtn.textContent = '…';
+
+  try {
+    await rotateJpeg90cw(it);
+
+    // Refrescar miniatura en overlay
+    const fig = overlayGrid.children[overlaySelIdx];
+    const img = fig?.querySelector('img');
+    if (img) {
+      const newUrl = await getDisplayURL(it, 'overlay');
+      img.src = newUrl;
+    }
+    // Si el visor está abierto, refrescarlo también
+    if (isViewerOpen()) await updateViewerImage();
+
+    progressEl.textContent = `Rotada: ${it.name}`;
+  } catch (err) {
+    console.error('Error rotando', err);
+    progressEl.textContent = `Error al rotar: ${err.message}`;
+  } finally {
+    rotateBtn.disabled = false;
+    rotateBtn.innerHTML = `<svg style="width:16px;height:16px;vertical-align:middle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M21 8A9 9 0 1 1 15 3.5"/></svg> Rotar`;
+  }
+}
+
 /* ---------- Viewer ---------- */
 function isViewerOpen() { return !viewer.hidden; }
 function openViewer() { updateViewerImage(); viewer.hidden = false; viewer.setAttribute('aria-hidden', 'false'); updateViewerButtonsState(); }
@@ -768,6 +888,11 @@ function overlayKeydown(e) {
       vis.forEach((it, idx) => { if (isManaged(it)) return; const key = keyFor(it); if (!trashSet.has(key) && !ideaSet.has(key) && !starSet.has(key)) { starSet.add(key); trashSet.delete(key); ideaSet.delete(key); const fig = overlayGrid.children[idx]; if (fig) applyItemClasses(fig, it); } });
       updateActionButtons(); overlayEdgeIntent = null; updateViewerButtonsState(); updateCountersUI(); break;
     }
+    case 'j': case 'J': {
+      e.preventDefault();
+      rotateSelected();
+      break;
+    }
   }
 }
 
@@ -798,6 +923,7 @@ function viewerKeydown(e) {
 
 /* ---------- Botones overlay ---------- */
 overlayClose.addEventListener('click', () => hideOverlay());
+rotateBtn.addEventListener('click', rotateSelected);
 overlayPrev.addEventListener('click', () => { if (currentOverlayIndex > 0) { currentOverlayIndex--; overlaySelIdx = 0; overlayEdgeIntent = null; renderOverlay(); } });
 overlayNext.addEventListener('click', () => { if (currentOverlayIndex < groups.length - 1) { currentOverlayIndex++; overlaySelIdx = 0; overlayEdgeIntent = null; renderOverlay(); } });
 
