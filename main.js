@@ -28,7 +28,6 @@ const overlayMeta  = document.getElementById('overlayMeta');
 const overlayClose = document.getElementById('closeOverlay');
 const overlayPrev  = document.getElementById('overlayPrev');
 const overlayNext  = document.getElementById('overlayNext');
-const rotateBtn    = document.getElementById('rotateBtn');
 // Viewer
 const viewer        = document.getElementById('photoViewer');
 const viewerImg     = document.getElementById('viewerImg');
@@ -326,12 +325,15 @@ function renderPage(pageNum) {
       const fig = node.querySelector('.item');
       const img = node.querySelector('img');
       const cap = node.querySelector('.caption');
-      const btnTrash = node.querySelector('.btn-trash');
-      const btnStar  = node.querySelector('.btn-star');
-      const btnIdea  = node.querySelector('.btn-idea');
+      const btnTrash  = node.querySelector('.btn-trash');
+      const btnStar   = node.querySelector('.btn-star');
+      const btnIdea   = node.querySelector('.btn-idea');
+      const btnRotate = node.querySelector('.btn-rotate');
       img.alt = it.name; cap.textContent = it.name;
       getDisplayURL(it, 'list').then(url => { img.src = url; }).catch(() => { img.alt = it.name + ' (sin preview)'; });
       applyItemClasses(fig, it);
+      // Rotar solo visible en overlay, ocultar en lista
+      if (btnRotate) btnRotate.style.display = 'none';
       if (!isManaged(it)) {
         const key = keyFor(it);
         btnTrash.setAttribute('aria-pressed', trashSet.has(key) + '');
@@ -459,13 +461,31 @@ function renderOverlay() {
     const fig = node.querySelector('.item');
     const img = node.querySelector('img');
     const cap = node.querySelector('.caption');
-    const btnTrash = node.querySelector('.btn-trash');
-    const btnStar  = node.querySelector('.btn-star');
-    const btnIdea  = node.querySelector('.btn-idea');
+    const btnTrash  = node.querySelector('.btn-trash');
+    const btnStar   = node.querySelector('.btn-star');
+    const btnIdea   = node.querySelector('.btn-idea');
+    const btnRotate = node.querySelector('.btn-rotate');
     fig.tabIndex = -1;
     img.alt = it.name; cap.textContent = it.name;
     getDisplayURL(it, 'overlay').then(url => { img.src = url; }).catch(() => { img.alt = it.name + ' (sin preview)'; });
     applyItemClasses(fig, it);
+
+    // Botón rotar — solo JPEG no gestionado
+    if (btnRotate) {
+      if (!isManaged(it) && isJpeg(it)) {
+        btnRotate.addEventListener('click', async e => {
+          e.stopPropagation();
+          setOverlaySelected(idx);
+          await rotateSelected();
+          // refrescar imagen de esta miniatura
+          const newUrl = await getDisplayURL(it, 'overlay');
+          img.src = newUrl;
+        });
+      } else {
+        btnRotate.style.display = 'none';
+      }
+    }
+
     if (!isManaged(it)) {
       const key = keyFor(it);
       btnTrash.setAttribute('aria-pressed', trashSet.has(key) + '');
@@ -577,29 +597,19 @@ async function rotateSelected() {
   const it  = vis[overlaySelIdx];
   if (!it || isManaged(it) || !isJpeg(it)) return;
 
-  rotateBtn.disabled = true;
-  rotateBtn.textContent = '…';
-
   try {
     await rotateJpeg90cw(it);
-
-    // Refrescar miniatura en overlay
     const fig = overlayGrid.children[overlaySelIdx];
     const img = fig?.querySelector('img');
     if (img) {
       const newUrl = await getDisplayURL(it, 'overlay');
       img.src = newUrl;
     }
-    // Si el visor está abierto, refrescarlo también
     if (isViewerOpen()) await updateViewerImage();
-
     progressEl.textContent = `Rotada: ${it.name}`;
   } catch (err) {
     console.error('Error rotando', err);
     progressEl.textContent = `Error al rotar: ${err.message}`;
-  } finally {
-    rotateBtn.disabled = false;
-    rotateBtn.innerHTML = `<svg style="width:16px;height:16px;vertical-align:middle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M21 8A9 9 0 1 1 15 3.5"/></svg> Rotar`;
   }
 }
 
@@ -923,7 +933,6 @@ function viewerKeydown(e) {
 
 /* ---------- Botones overlay ---------- */
 overlayClose.addEventListener('click', () => hideOverlay());
-rotateBtn.addEventListener('click', rotateSelected);
 overlayPrev.addEventListener('click', () => { if (currentOverlayIndex > 0) { currentOverlayIndex--; overlaySelIdx = 0; overlayEdgeIntent = null; renderOverlay(); } });
 overlayNext.addEventListener('click', () => { if (currentOverlayIndex < groups.length - 1) { currentOverlayIndex++; overlaySelIdx = 0; overlayEdgeIntent = null; renderOverlay(); } });
 
