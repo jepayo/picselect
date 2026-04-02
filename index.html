@@ -14,7 +14,6 @@
     <h1>Organizador por franjas</h1>
 
     <div class="controls">
-
       <div class="ctrl-group">
         <div class="ctrl-label">Ventana</div>
         <div class="ctrl-row">
@@ -23,9 +22,7 @@
           <button class="btn-mins" data-mins="10">10'</button>
         </div>
       </div>
-
       <div class="ctrl-sep"></div>
-
       <div class="ctrl-group">
         <div class="ctrl-label">Categorías · mover a carpeta</div>
         <div class="ctrl-row">
@@ -43,9 +40,7 @@
           </button>
         </div>
       </div>
-
       <div class="ctrl-sep"></div>
-
       <div class="ctrl-group ctrl-right">
         <div class="ctrl-label">&nbsp;</div>
         <div class="ctrl-row">
@@ -53,7 +48,6 @@
           <button id="pickDir" type="button">📁 Abrir carpeta</button>
         </div>
       </div>
-
     </div>
 
     <div class="counters" aria-live="polite">
@@ -90,6 +84,11 @@
     <figure class="item">
       <img loading="lazy" />
       <figcaption class="caption"></figcaption>
+      <button class="mark btn-rotate" type="button" title="Rotar 90° derecha (J)">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 2v6h-6"/><path d="M21 8A9 9 0 1 1 15 3.5"/>
+        </svg>
+      </button>
       <button class="mark btn-trash" type="button" aria-pressed="false" title="Marcar para borrar">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3 6h18M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2M19 6l-1 13a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m4 4v8m6-8v8"
@@ -119,7 +118,7 @@
       <div class="overlay-mid">
         <h2 id="overlayTitle"></h2>
         <div id="overlayMeta" class="overlay-meta"></div>
-        <div class="overlay-help">Atajos: Espacio pantalla completa · ← → ↑ ↓ mover · Z estrella · X papelera · I ideas · R papelera a no ⭐ · P favorita a no categorizadas · Esc volver</div>
+        <div class="overlay-help">Atajos: Espacio pantalla completa · ← → ↑ ↓ mover · Z estrella · X papelera · I ideas · R papelera a no ⭐ · P favorita a no categorizadas · J rotar · Esc volver</div>
       </div>
       <div class="overlay-right">
         <button id="overlayPrev" class="overlay-nav" type="button" title="Bucket anterior">◀</button>
