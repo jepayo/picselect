@@ -6,7 +6,6 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 
 /* -------- Controls -------- */
 .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; }
-
 .ctrl-group { display: flex; flex-direction: column; gap: 4px; }
 .ctrl-right { margin-left: auto; }
 .ctrl-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
@@ -28,36 +27,24 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 .controls button:active:not(:disabled) { transform: translateY(0); filter: brightness(.87); }
 .controls button:disabled { opacity: .45; cursor: not-allowed; }
 
-/* Contador + label dentro de botones de categoría */
 .btn-count { font-size: 22px; font-weight: 700; line-height: 1; }
 .btn-label { font-size: 11px; font-weight: 600; opacity: .9; }
 
-/* Botones de minutos */
-.btn-mins {
-  background: #f1f3f4; color: #555; border-color: #dadce0;
-  font-size: 18px !important; font-weight: 700 !important;
-  flex-direction: row !important; min-width: 52px;
-}
+.btn-mins { background: #f1f3f4; color: #555; border-color: #dadce0; font-size: 18px !important; font-weight: 700 !important; flex-direction: row !important; min-width: 52px; }
 .btn-mins.active { background: #1a73e8; color: #fff; border-color: #1558b0; }
 
-/* Botones de categoría */
 #moveTrash    { background: #ffefef; color: #c62828; border-color: #f5b5b5; }
 #moveIdeas    { background: #e9f9ef; color: #1b7f3a; border-color: #bfe8cc; }
 #moveSelected { background: #fff8e1; color: #8a6a00; border-color: #f7d27a; }
 
-/* Abrir carpeta y toggle — fila (no columna) */
-#pickDir      { background: #1a73e8; color: #fff; border-color: #1558b0; flex-direction: row !important; gap: 6px !important; }
+#pickDir       { background: #1a73e8; color: #fff; border-color: #1558b0; flex-direction: row !important; gap: 6px !important; }
 #toggleManaged { background: #f1f3f4; color: #999; border-color: #dadce0; flex-direction: row !important; gap: 6px !important; }
 #toggleManaged.is-on { background: #e8f0fe; color: #1a73e8; border-color: #aecbfa; }
 
 /* -------- Counters -------- */
 #progress { margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 1.2em; }
 .counters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
-.badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;
-  border: 1px solid #e5e5e5; background: #fafafa; color: #333;
-}
+.badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; border: 1px solid #e5e5e5; background: #fafafa; color: #333; }
 .badge.pending { background: #eef4ff; border-color: #c9d8ff; color: #274690; }
 .badge.total   { background: #f3f3f3; border-color: #e0e0e0; color: #444; }
 
@@ -97,6 +84,7 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 }
 .item.locked[data-locked="TRASH"]::after { background: rgba(0,0,0,0.55); }
 
+/* Botones de acción en miniaturas */
 .mark {
   position: absolute; border: 1px solid #ddd; background: rgba(255,255,255,.92);
   padding: 6px; border-radius: 6px; cursor: pointer; line-height: 0; color: #444;
@@ -105,10 +93,11 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 .mark:hover { transform: scale(1.05); }
 .mark:active { transform: scale(0.98); }
 .mark .icon { width: 18px; height: 18px; display: block; }
-.btn-trash { top: 6px; right: 6px; }
+
 .btn-rotate { top: 6px; left: 6px; }
-.btn-star  { bottom: 6px; left: 6px; }
-.btn-idea  { bottom: 6px; right: 6px; }
+.btn-trash  { top: 6px; right: 6px; }
+.btn-star   { bottom: 6px; left: 6px; }
+.btn-idea   { bottom: 6px; right: 6px; }
 
 .item.trashed .btn-trash { background: #ffefef; border-color: #f5b5b5; color: #c62828; }
 .item.starred .btn-star  { background: #fff8e1; border-color: #f7d27a; color: #f4b400; }
@@ -121,6 +110,7 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 .overlay-left, .overlay-mid, .overlay-right { display: flex; align-items: center; gap: 8px; }
 .overlay-mid { flex-direction: column; align-items: flex-start; flex: 1; }
 .overlay-close, .overlay-nav { border: 1px solid #ddd; background: #fafafa; padding: 6px 10px; border-radius: 6px; cursor: pointer; flex-direction: row; }
+.overlay-close:disabled { opacity: .45; cursor: not-allowed; }
 #overlayTitle { margin: 0; font-size: 16px; }
 .overlay-meta { color: var(--muted); font-size: 12px; }
 .overlay-help { color: var(--muted); font-size: 12px; }
@@ -133,38 +123,6 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 }
 .overlay-grid .item { max-height: 400px; }
 .overlay-grid .item img { height: 320px; object-fit: contain; background: #f4f4f4; }
-
-/* Score badge en miniaturas */
-.score-badge {
-  position: absolute; top: 6px; left: 6px;
-  background: rgba(0,0,0,.65); color: #fff;
-  font-size: 11px; font-weight: 700; border-radius: 999px;
-  padding: 3px 7px; pointer-events: none; z-index: 2;
-}
-.score-badge.score-hi  { background: rgba(30,120,50,.85); }
-.score-badge.score-mid { background: rgba(100,100,100,.75); }
-.score-badge.score-lo  { background: rgba(160,30,30,.8); }
-
-/* Panel de análisis */
-.analyze-panel {
-  background: #fafafa; border-top: 1px solid #e8e8e8;
-  padding: 12px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-}
-.analyze-panel[hidden] { display: none !important; }
-.analyze-sliders { display: flex; gap: 24px; flex-wrap: wrap; flex: 1; }
-.analyze-sliders label {
-  display: flex; flex-direction: column; gap: 4px;
-  font-size: 13px; color: #333; min-width: 200px;
-}
-.analyze-sliders input[type=range] { width: 100%; }
-#runAnalysis {
-  background: #1a73e8; color: #fff; border: none;
-  padding: 8px 18px; border-radius: 999px; font-size: 13px; font-weight: 600;
-  cursor: pointer; white-space: nowrap;
-}
-#runAnalysis:hover { filter: brightness(.9); }
-#runAnalysis:disabled { opacity: .5; cursor: not-allowed; }
-.analyze-progress { font-size: 12px; color: #666; min-width: 180px; }
 
 /* -------- Visor -------- */
 .viewer[hidden] { display: none !important; }
