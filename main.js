@@ -2,6 +2,7 @@
 const groupsEl        = document.getElementById('groups');
 const pickDirBtn      = document.getElementById('pickDir');
 const toggleManagedBtn= document.getElementById('toggleManaged');
+const toggleExpressBtn= document.getElementById('toggleExpress');
 const moveBtn         = document.getElementById('moveTrash');
 const moveIdeasBtn    = document.getElementById('moveIdeas');
 const moveSelectedBtn = document.getElementById('moveSelected');
@@ -54,6 +55,8 @@ let overlaySelIdx = 0;
 let lastOpenAbsIndex = null;
 let overlayEdgeIntent = null;
 let showManaged = true;
+let expressMode = false;
+const EXPRESS_MAX = 8;
 
 /* ---------- Utilidades ---------- */
 function msPerBucket() { return currentMins * 60 * 1000; }
@@ -242,7 +245,11 @@ function renderPage(pageNum) {
     ghit.addEventListener('keydown', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); openBucket(absIndex); } });
     section.addEventListener('click', ev => { if (ev.target.closest('.ghit,.btn-trash,.btn-star,.btn-idea,figure.item')) return; listMode = 'bucket'; setSelectedBucket(absIndex); updateListSelectionUI(); });
     const grid = sectionFrag.querySelector('.grid');
-    for (const it of itemsToShow) {
+    const allVisible = itemsToShow;
+    const toRender = expressMode && allVisible.length > EXPRESS_MAX ? allVisible.slice(0, EXPRESS_MAX) : allVisible;
+    const remaining = allVisible.length - toRender.length;
+
+    for (const it of toRender) {
       const node = itemTpl.content.cloneNode(true);
       const fig = node.querySelector('.item');
       const img = node.querySelector('img');
@@ -279,6 +286,16 @@ function renderPage(pageNum) {
       } else { btnRotate?.remove(); btnTrash.remove(); btnStar.remove(); btnIdea.remove(); }
       grid.appendChild(node);
     }
+
+    // Placeholder "más fotos" en modo express
+    if (remaining > 0) {
+      const more = document.createElement('div');
+      more.className = 'item-more';
+      more.innerHTML = `<span class="more-count">+${remaining}</span><span class="more-label">fotos más</span><span class="more-label">Abrir bucket para ver todas</span>`;
+      more.addEventListener('click', () => openBucket(absIndex));
+      grid.appendChild(more);
+    }
+
     groupsEl.appendChild(sectionFrag);
   });
 }
@@ -524,6 +541,12 @@ toggleManagedBtn.addEventListener('click', () => {
   updatePagerState(); renderPage(currentPage); updateListSelectionUI();
   if (!overlay.hidden && currentOverlayIndex !== null) { const vis = currentVisibleOverlayItems(); overlaySelIdx = Math.min(overlaySelIdx, Math.max(0, vis.length - 1)); renderOverlay(); }
 });
+
+toggleExpressBtn.addEventListener('click', () => {
+  expressMode = !expressMode;
+  toggleExpressBtn.classList.toggle('is-on', expressMode);
+  renderPage(currentPage);
+});
 document.querySelectorAll('.btn-mins').forEach(btn => {
   btn.addEventListener('click', () => {
     const newMins = parseInt(btn.dataset.mins, 10); if (newMins === currentMins) return;
@@ -619,4 +642,5 @@ viewerBtnIdea .addEventListener('click', () => { const vis = currentVisibleOverl
 /* ---------- Inicial ---------- */
 renderPage(currentPage); updateListSelectionUI(); updateActionButtons(); updateCountersUI();
 toggleManagedBtn.classList.toggle('is-on', showManaged);
+toggleExpressBtn.classList.toggle('is-on', expressMode);
 Object.assign(window, { allItems, groups, openBucket, moveMarkedToTrash, moveMarkedToIdeas, moveMarkedToSelected });
