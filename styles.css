@@ -40,6 +40,21 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 #pickDir       { background: #1a73e8; color: #fff; border-color: #1558b0; flex-direction: row !important; gap: 6px !important; }
 #toggleManaged { background: #f1f3f4; color: #999; border-color: #dadce0; flex-direction: row !important; gap: 6px !important; }
 #toggleManaged.is-on { background: #e8f0fe; color: #1a73e8; border-color: #aecbfa; }
+#toggleExpress { background: #f1f3f4; color: #999; border-color: #dadce0; flex-direction: row !important; gap: 6px !important; }
+#toggleExpress.is-on { background: #fff3e0; color: #e65100; border-color: #ffb74d; }
+
+/* Placeholder "más fotos" en modo express */
+.item-more {
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 6px;
+  border: 2px dashed #ddd; border-radius: 6px;
+  background: #fafafa; cursor: pointer;
+  min-height: 140px; color: #888; font-size: 13px; font-weight: 600;
+  transition: border-color .15s, background .15s;
+}
+.item-more:hover { border-color: #aaa; background: #f0f0f0; }
+.item-more .more-count { font-size: 22px; font-weight: 700; color: #555; }
+.item-more .more-label { font-size: 11px; color: #999; }
 
 /* -------- Counters -------- */
 #progress { margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 1.2em; }
