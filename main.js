@@ -261,6 +261,8 @@ function renderPage(pageNum) {
       const btnTrash  = node.querySelector('.btn-trash');
       const btnStar   = node.querySelector('.btn-star');
       const btnIdea   = node.querySelector('.btn-idea');
+      const btnStar   = node.querySelector('.btn-star');
+      const btnIdea   = node.querySelector('.btn-idea');
       img.alt = it.name; cap.textContent = it.name;
       getDisplayURL(it, 'list').then(url => { img.src = url; }).catch(() => { img.alt = it.name + ' (sin preview)'; });
       applyItemClasses(fig, it);
@@ -276,6 +278,11 @@ function renderPage(pageNum) {
             } catch (err) { progressEl.textContent = `Error al rotar: ${err.message}`; }
           });
         } else { btnRotate.style.display = 'none'; }
+      }
+      if (btnDupes) {
+        if (!isManaged(it)) {
+          btnDupes.addEventListener('click', async e => { e.stopPropagation(); await findDuplicates(it); });
+        } else { btnDupes.style.display = 'none'; }
       }
       if (!isManaged(it)) {
         const key = keyFor(it);
