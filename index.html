@@ -90,6 +90,11 @@
           <path d="M21 2v6h-6"/><path d="M21 8A9 9 0 1 1 15 3.5"/>
         </svg>
       </button>
+      <button class="mark btn-dupes" type="button" title="Buscar duplicados">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V4a2 2 0 0 1 2-2h12"/>
+        </svg>
+      </button>
       <button class="mark btn-trash" type="button" aria-pressed="false" title="Marcar para borrar">
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3 6h18M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2M19 6l-1 13a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m4 4v8m6-8v8"
@@ -151,6 +156,15 @@
       </svg>
     </button>
     <div class="viewer-help">Espacio: volver · ←/→: cambiar · Z: estrella · X: papelera · I: ideas · R: papelera a no ⭐ · P: favorita a no categorizadas</div>
+  </div>
+
+  <!-- Panel duplicados flotante -->
+  <div id="dupesPanel" class="dupes-panel" hidden>
+    <div class="dupes-header">
+      <span class="dupes-title">🔍 Duplicados encontrados</span>
+      <button id="dupesClose" type="button">✕</button>
+    </div>
+    <div id="dupesList" class="dupes-list"></div>
   </div>
 
   <script type="module" src="main.js"></script>
