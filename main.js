@@ -31,10 +31,11 @@ const viewerCaption   = document.getElementById('viewerCaption');
 const viewerBtnTrash  = document.getElementById('viewerTrash');
 const viewerBtnStar   = document.getElementById('viewerStar');
 const viewerBtnIdea   = document.getElementById('viewerIdea');
-const dupesPanel = document.getElementById('dupesPanel');
-const dupesList  = document.getElementById('dupesList');
-const dupesClose = document.getElementById('dupesClose');
+const groupTpl        = document.getElementById('groupTpl');
 const itemTpl         = document.getElementById('itemTpl');
+const dupesPanel      = document.getElementById('dupesPanel');
+const dupesList       = document.getElementById('dupesList');
+const dupesClose      = document.getElementById('dupesClose');
 
 /* ---------- Estado ---------- */
 let allItems  = [];
@@ -44,6 +45,8 @@ let starSet   = new Set();
 let ideaSet   = new Set();
 let currentPage = 1;
 let currentMins = 5;
+let expressMode = false;
+const EXPRESS_MAX = 8;
 const BUCKETS_PER_PAGE = 3;
 let rootDirHandle = null;
 let itemByKey = new Map();
@@ -57,8 +60,6 @@ let overlaySelIdx = 0;
 let lastOpenAbsIndex = null;
 let overlayEdgeIntent = null;
 let showManaged = true;
-let expressMode = false;
-const EXPRESS_MAX = 8;
 
 /* ---------- Utilidades ---------- */
 function msPerBucket() { return currentMins * 60 * 1000; }
@@ -217,123 +218,11 @@ function goToPage(n) { currentPage = clamp(n, 1, totalPages()); updatePagerState
 function revokeListURLs() { for (const u of activeListURLs) URL.revokeObjectURL(u); activeListURLs.clear(); for (const u of heicListURLCache.values()) URL.revokeObjectURL(u); heicListURLCache.clear(); }
 function revokeOverlayURLs() { for (const u of activeOverlayURLs) URL.revokeObjectURL(u); activeOverlayURLs.clear(); for (const u of heicOverlayURLCache.values()) URL.revokeObjectURL(u); heicOverlayURLCache.clear(); }
 
-/* ---------- Render lista ---------- */
-function applyItemClasses(fig, it) {
-  fig.classList.toggle('locked', isManaged(it));
-  if (isManaged(it)) { fig.dataset.locked = it.managed === 'trash' ? 'TRASH' : it.managed === 'ideas' ? 'IDEAS' : 'SELECTED'; fig.classList.remove('trashed','starred','idea'); return; }
-  const key = keyFor(it);
-  fig.classList.toggle('trashed', trashSet.has(key));
-  fig.classList.toggle('starred', starSet.has(key));
-  fig.classList.toggle('idea',    ideaSet.has(key));
-}
-function makeExclusive(toSet, o1, o2, key) { if (toSet.has(key)) toSet.delete(key); else { toSet.add(key); o1.delete(key); o2.delete(key); } }
-function toggleTrash(key, fig) { const it = itemByKey.get(key); if (isManaged(it)) return; makeExclusive(trashSet, starSet, ideaSet, key); applyItemClasses(fig, it); updateActionButtons(); updateCountersUI(); }
-function toggleStar(key, fig)  { const it = itemByKey.get(key); if (isManaged(it)) return; makeExclusive(starSet, trashSet, ideaSet, key);  applyItemClasses(fig, it); updateActionButtons(); updateCountersUI(); }
-function toggleIdea(key, fig)  { const it = itemByKey.get(key); if (isManaged(it)) return; makeExclusive(ideaSet, trashSet, starSet, key);   applyItemClasses(fig, it); updateActionButtons(); updateCountersUI(); }
-
-function renderPage(pageNum) {
-  revokeListURLs(); groupsEl.innerHTML = '';
-  if (!groups.length) { groupsEl.innerHTML = '<p style="padding:16px;color:#666">No hay imágenes cargadas.</p>'; return; }
-  const startIdx = (pageNum - 1) * BUCKETS_PER_PAGE;
-  groups.slice(startIdx, Math.min(startIdx + BUCKETS_PER_PAGE, groups.length)).forEach((g, iLocal) => {
-    const absIndex = startIdx + iLocal;
-    const itemsToShow = visibleItemsForBucket(absIndex);
-    const sectionFrag = groupTpl.content.cloneNode(true);
-    const section = sectionFrag.querySelector('.group');
-    section.dataset.absIndex = String(absIndex);
-    section.querySelector('.gtitle').textContent = `${fmtSpan(g.startTs, g.endTs)} · ${itemsToShow.length} foto(s)`;
-    const ghit = sectionFrag.querySelector('.ghit');
-    ghit.addEventListener('click', () => openBucket(absIndex));
-    ghit.addEventListener('keydown', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); openBucket(absIndex); } });
-    section.addEventListener('click', ev => { if (ev.target.closest('.ghit,.btn-trash,.btn-star,.btn-idea,figure.item')) return; listMode = 'bucket'; setSelectedBucket(absIndex); updateListSelectionUI(); });
-    const grid = sectionFrag.querySelector('.grid');
-    const allVisible = itemsToShow;
-    const toRender = expressMode && allVisible.length > EXPRESS_MAX ? allVisible.slice(0, EXPRESS_MAX) : allVisible;
-    const remaining = allVisible.length - toRender.length;
-
-    for (const it of toRender) {
-      const node = itemTpl.content.cloneNode(true);
-      const fig = node.querySelector('.item');
-      const img = node.querySelector('img');
-      const cap = node.querySelector('.caption');
-      const btnRotate = node.querySelector('.btn-rotate');
-      const btnDupes  = node.querySelector('.btn-dupes');
-      const btnTrash  = node.querySelector('.btn-trash');
-      const btnStar   = node.querySelector('.btn-star');
-      const btnIdea   = node.querySelector('.btn-idea');
-      img.alt = it.name; cap.textContent = it.name;
-      getDisplayURL(it, 'list').then(url => { img.src = url; }).catch(() => { img.alt = it.name + ' (sin preview)'; });
-      applyItemClasses(fig, it);
-      if (btnRotate) {
-        if (!isManaged(it) && isJpeg(it)) {
-          btnRotate.addEventListener('click', async e => {
-            e.stopPropagation();
-            try {
-              await rotateJpeg90cw(it);
-              const newUrl = await getDisplayURL(it, 'list');
-              img.src = ''; img.src = newUrl;
-              progressEl.textContent = `Rotada: ${it.name}`;
-            } catch (err) { progressEl.textContent = `Error al rotar: ${err.message}`; }
-          });
-        } else { btnRotate.style.display = 'none'; }
-      }
-      if (btnDupes) {
-        if (!isManaged(it)) {
-          btnDupes.addEventListener('click', async e => { e.stopPropagation(); await findDuplicates(it); });
-        } else { btnDupes.style.display = 'none'; }
-      }
-      if (!isManaged(it)) {
-        const key = keyFor(it);
-        btnTrash.setAttribute('aria-pressed', trashSet.has(key) + '');
-        btnStar .setAttribute('aria-pressed', starSet.has(key)  + '');
-        btnIdea .setAttribute('aria-pressed', ideaSet.has(key)  + '');
-        const sync = () => { btnTrash.setAttribute('aria-pressed', trashSet.has(key)+''); btnStar.setAttribute('aria-pressed', starSet.has(key)+''); btnIdea.setAttribute('aria-pressed', ideaSet.has(key)+''); };
-        btnTrash.addEventListener('click', e => { e.stopPropagation(); toggleTrash(key, fig); sync(); });
-        btnStar .addEventListener('click', e => { e.stopPropagation(); toggleStar(key, fig);  sync(); });
-        btnIdea .addEventListener('click', e => { e.stopPropagation(); toggleIdea(key, fig);  sync(); });
-      } else { btnRotate?.remove(); btnTrash.remove(); btnStar.remove(); btnIdea.remove(); }
-      grid.appendChild(node);
-    }
-
-    // Placeholder "más fotos" en modo express
-    if (remaining > 0) {
-      const more = document.createElement('div');
-      more.className = 'item-more';
-      more.innerHTML = `<span class="more-count">+${remaining}</span><span class="more-label">fotos más</span><span class="more-label">Abrir bucket para ver todas</span>`;
-      more.addEventListener('click', () => openBucket(absIndex));
-      grid.appendChild(more);
-    }
-
-    groupsEl.appendChild(sectionFrag);
-  });
-}
-
-/* ---------- Selección en lista ---------- */
-function ensureBucketVisible(absIndex) { const tp = Math.floor(absIndex / BUCKETS_PER_PAGE) + 1; if (tp !== currentPage) goToPage(tp); else updateListSelectionUI(); }
-function getBucketSection(absIndex) { return groupsEl.querySelector(`.group[data-abs-index="${absIndex}"]`); }
-function getBucketGrid(absIndex) { const s = getBucketSection(absIndex); return s ? s.querySelector('.grid') : null; }
-function setSelectedBucket(absIndex) { selBucketAbsIndex = clamp(absIndex, 0, groups.length - 1); ensureBucketVisible(selBucketAbsIndex); getBucketSection(selBucketAbsIndex)?.scrollIntoView({ block: 'nearest' }); }
-function getGridCols(container) { const ch = Array.from(container?.children || []); if (ch.length <= 1) return 1; const top0 = ch[0].offsetTop; let cols = 0; for (const el of ch) { if (el.offsetTop !== top0) break; cols++; } return Math.max(1, cols); }
-function setSelectedPhoto(newIdx) { const vis = visibleItemsForBucket(selBucketAbsIndex); if (!vis.length) return; selPhotoIndex = clamp(newIdx, 0, vis.length - 1); updateListSelectionUI(true); getBucketGrid(selBucketAbsIndex)?.children[selPhotoIndex]?.scrollIntoView({ block: 'nearest' }); }
-function clearAllListSelections() { groupsEl.querySelectorAll('.group').forEach(s => { s.classList.remove('bucket-selected','photo-mode'); s.querySelectorAll('.item.selected').forEach(f => f.classList.remove('selected')); }); }
-function updateListSelectionUI(onlyPhoto = false) {
-  const sec = getBucketSection(selBucketAbsIndex);
-  if (!onlyPhoto) clearAllListSelections();
-  if (sec) {
-    sec.classList.add('bucket-selected');
-    if (listMode === 'photo') sec.classList.add('photo-mode');
-    const grid = sec.querySelector('.grid');
-    grid?.querySelectorAll('.item.selected').forEach(f => f.classList.remove('selected'));
-    if (listMode === 'photo') { const vis = visibleItemsForBucket(selBucketAbsIndex); if (!vis.length) return; const fig = grid?.children[selPhotoIndex]; if (fig?.classList?.contains('item')) fig.classList.add('selected'); }
-  }
-}
-
-/* ---------- pHash — duplicados ---------- */
+/* ---------- pHash — similares ---------- */
 const PHASH_SIZE = 32;
 const DCT_SIZE   = 8;
-const pHashCache = new Map(); // key -> BigInt hash (memoria sesión)
+const pHashCache = new Map();
 
-/* IndexedDB para persistir hashes entre sesiones */
 let phashDB = null;
 function openPhashDB() {
   return new Promise((res, rej) => {
@@ -360,7 +249,6 @@ async function dbSetHash(key, hash) {
     tx.oncomplete = res; tx.onerror = res;
   });
 }
-
 function dct8(row) {
   const N = 8, out = new Float64Array(N);
   for (let k = 0; k < N; k++) {
@@ -370,15 +258,12 @@ function dct8(row) {
   }
   return out;
 }
-
 function computePHash(imgEl) {
   const c = document.createElement('canvas');
   c.width = c.height = PHASH_SIZE;
   const ctx = c.getContext('2d');
   ctx.drawImage(imgEl, 0, 0, PHASH_SIZE, PHASH_SIZE);
   const { data } = ctx.getImageData(0, 0, PHASH_SIZE, PHASH_SIZE);
-
-  // Grayscale
   const gray = [];
   for (let i = 0; i < PHASH_SIZE; i++) {
     gray.push([]);
@@ -387,89 +272,86 @@ function computePHash(imgEl) {
       gray[i].push(0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2]);
     }
   }
-
-  // DCT 2D sobre bloque 8x8 top-left
   const dctRows = gray.slice(0, DCT_SIZE).map(r => dct8(r.slice(0, DCT_SIZE)));
   const dctCols = [];
-  for (let j = 0; j < DCT_SIZE; j++) {
-    const col = dctRows.map(r => r[j]);
-    dctCols.push(dct8(col));
-  }
-
-  // Aplanar (excluir [0,0] = DC)
+  for (let j = 0; j < DCT_SIZE; j++) dctCols.push(dct8(dctRows.map(r => r[j])));
   const vals = [];
   for (let i = 0; i < DCT_SIZE; i++)
     for (let j = 0; j < DCT_SIZE; j++)
       if (!(i===0 && j===0)) vals.push(dctCols[i][j]);
-
   const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
   let hash = 0n;
-  for (let i = 0; i < vals.length; i++)
-    if (vals[i] >= mean) hash |= (1n << BigInt(i));
+  for (let i = 0; i < vals.length; i++) if (vals[i] >= mean) hash |= (1n << BigInt(i));
   return hash;
 }
-
 function hammingDistance(a, b) {
   let x = a ^ b, d = 0;
   while (x) { d += Number(x & 1n); x >>= 1n; }
   return d;
 }
-
 async function getPHashForItem(it) {
   const key = keyFor(it);
-
-  // 1. Memoria de sesión
   if (pHashCache.has(key)) return pHashCache.get(key);
-
-  // 2. IndexedDB (sesiones anteriores)
   const cached = await dbGetHash(key);
   if (cached !== null) { pHashCache.set(key, cached); return cached; }
-
-  // 3. Calcular
-  const url = URL.createObjectURL(isHeicFile(it.file)
-    ? await enqueueHeicConversion(it.file)
-    : it.file);
-  const img = await new Promise((res, rej) => {
-    const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url;
-  });
+  const url = URL.createObjectURL(isHeicFile(it.file) ? await enqueueHeicConversion(it.file) : it.file);
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
   URL.revokeObjectURL(url);
-
   const hash = computePHash(img);
   pHashCache.set(key, hash);
-  dbSetHash(key, hash); // guardar async, sin bloquear
+  dbSetHash(key, hash);
   return hash;
 }
 
 async function findDuplicates(srcItem) {
   dupesPanel.hidden = false;
-  dupesList.innerHTML = '<div class="dupes-searching">Calculando…</div>';
+  dupesList.innerHTML = '<div class="dupes-searching">Iniciando…</div>';
+  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => requestAnimationFrame(r));
 
-  const srcHash = await getPHashForItem(srcItem);
+  dupesList.innerHTML = '<div class="dupes-searching">Calculando hash de la foto…</div>';
+  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => requestAnimationFrame(r));
+
+  let srcHash;
+  try { srcHash = await getPHashForItem(srcItem); }
+  catch (err) { dupesList.innerHTML = `<div class="dupes-searching">Error: ${err.message}</div>`; return; }
+
+  const total = allItems.length;
   const results = [];
 
-  for (const it of allItems) {
+  for (let i = 0; i < total; i++) {
+    const it = allItems[i];
     if (keyFor(it) === keyFor(srcItem)) continue;
+    if (i % 10 === 0) {
+      dupesList.innerHTML = `<div class="dupes-searching">Calculando hash ${i + 1} de ${total}…</div>`;
+      await new Promise(r => requestAnimationFrame(r));
+      await new Promise(r => requestAnimationFrame(r));
+    }
     try {
       const h = await getPHashForItem(it);
-      const dist = hammingDistance(srcHash, h);
-      results.push({ it, dist }); // todas, sin filtro de umbral
+      results.push({ it, dist: hammingDistance(srcHash, h) });
     } catch (_) {}
   }
+
+  dupesList.innerHTML = `<div class="dupes-searching">Ordenando resultados…</div>`;
+  await new Promise(r => requestAnimationFrame(r));
+  await new Promise(r => requestAnimationFrame(r));
 
   results.sort((a, b) => a.dist - b.dist);
   const top5 = results.slice(0, 5);
 
+  progressEl.textContent = `Búsqueda completada · mostrando las 5 fotos más parecidas`;
   dupesList.innerHTML = '';
+
   if (!top5.length) {
-    dupesList.innerHTML = '<div class="dupes-searching">No se encontraron duplicados.</div>';
+    dupesList.innerHTML = '<div class="dupes-searching">No hay otras fotos para comparar.</div>';
     return;
   }
 
   for (const { it, dist } of top5) {
-    // Encontrar qué bucket contiene este item
-    const bucketIdx = groups.findIndex(g => g.items.includes(it));
-
     const similarity = dist === 0 ? 'Idéntica' : dist <= 5 ? 'Muy parecida' : dist <= 10 ? 'Parecida' : 'Lejana';
+
     const div = document.createElement('div');
     div.className = 'dupe-item ' + (dist === 0 ? 'dupe-dist-0' : dist <= 5 ? 'dupe-dist-low' : dist <= 10 ? 'dupe-dist-mid' : '');
 
@@ -480,19 +362,55 @@ async function findDuplicates(srcItem) {
     info.className = 'dupe-info';
     info.innerHTML = `
       <span class="dupe-name" title="${it.name}">${it.name}</span>
-      <span class="dupe-meta">${similarity} · distancia ${dist} · Bucket ${bucketIdx + 1}</span>
+      <span class="dupe-meta">${similarity} · distancia ${dist}</span>
       <span class="dupe-meta">${new Date(it.ts).toLocaleString()}</span>
     `;
 
     const btn = document.createElement('button');
     btn.className = 'dupe-goto';
-    btn.textContent = `Ir →`;
+    btn.textContent = 'Ir →';
+
+    // Capturar el item en closure propio
+    const targetIt = it;
     btn.addEventListener('click', () => {
-      hideOverlay();
-      openBucket(bucketIdx);
-      // Seleccionar la foto específica dentro del bucket
-      const visIdx = visibleItemsForBucket(bucketIdx).indexOf(it);
-      if (visIdx >= 0) { overlaySelIdx = visIdx; setOverlaySelected(visIdx); }
+      console.log('=== IR PULSADO ===');
+      const targetKey = keyFor(targetIt);
+      console.log('TARGET KEY:', targetKey);
+      console.log('TARGET NAME:', targetIt.name, 'TS:', targetIt.ts);
+      console.log('GROUPS COUNT:', groups.length);
+
+      dupesPanel.hidden = true;
+
+      if (!overlay.hidden) {
+        overlay.hidden = true;
+        overlay.setAttribute('aria-hidden', 'true');
+        revokeOverlayURLs();
+        closeViewer();
+        currentOverlayIndex = null;
+        overlayEdgeIntent = null;
+      }
+
+      let targetBucketIdx = -1;
+      let targetVisIdx = -1;
+      for (let bi = 0; bi < groups.length; bi++) {
+        const vis = visibleItemsForBucket(bi);
+        const vi = vis.findIndex(x => keyFor(x) === targetKey);
+        if (vi >= 0) { targetBucketIdx = bi; targetVisIdx = vi; break; }
+      }
+
+      console.log('FOUND bucket:', targetBucketIdx, 'visIdx:', targetVisIdx);
+
+      if (targetBucketIdx < 0) {
+        progressEl.textContent = 'No se encontró el bucket de la foto.';
+        return;
+      }
+
+      const targetPage = Math.floor(targetBucketIdx / BUCKETS_PER_PAGE) + 1;
+      console.log('TARGET PAGE:', targetPage, 'CURRENT PAGE:', currentPage);
+
+      if (targetPage !== currentPage) goToPage(targetPage);
+      openBucket(targetBucketIdx);
+      if (targetVisIdx >= 0) setOverlaySelected(targetVisIdx);
     });
 
     div.appendChild(img); div.appendChild(info); div.appendChild(btn);
@@ -509,23 +427,19 @@ async function rotateJpeg90cw(it) {
   const binStr = srcBytes.reduce((s, b) => s + String.fromCharCode(b), '');
   let exifObj = null;
   try { exifObj = piexif.load(binStr); } catch (_) { exifObj = {}; }
-
   const blob = new Blob([srcBytes], { type: 'image/jpeg' });
   const url  = URL.createObjectURL(blob);
   const img  = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
   URL.revokeObjectURL(url);
-
   const canvas = document.createElement('canvas');
   canvas.width = img.naturalHeight; canvas.height = img.naturalWidth;
   const ctx = canvas.getContext('2d');
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.rotate(Math.PI / 2);
   ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
-
   const rotatedBlob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
   const rotatedBuf  = await rotatedBlob.arrayBuffer();
   const rotatedBytes = new Uint8Array(rotatedBuf);
-
   if (exifObj) {
     if (exifObj['0th']) { exifObj['0th'][piexif.ImageIFD.Orientation] = 1; exifObj['0th'][piexif.ImageIFD.ImageWidth] = canvas.width; exifObj['0th'][piexif.ImageIFD.ImageLength] = canvas.height; }
     if (exifObj['Exif']) { exifObj['Exif'][piexif.ExifIFD.PixelXDimension] = canvas.width; exifObj['Exif'][piexif.ExifIFD.PixelYDimension] = canvas.height; }
@@ -538,7 +452,6 @@ async function rotateJpeg90cw(it) {
       const ws = await it.fileHandle.createWritable(); await ws.write(finalBytes.buffer); await ws.close();
     } catch (_) { const ws = await it.fileHandle.createWritable(); await ws.write(rotatedBuf); await ws.close(); }
   } else { const ws = await it.fileHandle.createWritable(); await ws.write(rotatedBuf); await ws.close(); }
-
   const newFile = await it.fileHandle.getFile();
   it.file = newFile; it.size = newFile.size;
   const key = keyFor(it);
@@ -561,6 +474,111 @@ async function rotateSelected() {
   } catch (err) { console.error('Error rotando', err); progressEl.textContent = `Error al rotar: ${err.message}`; }
 }
 
+/* ---------- Render lista ---------- */
+function applyItemClasses(fig, it) {
+  fig.classList.toggle('locked', isManaged(it));
+  if (isManaged(it)) { fig.dataset.locked = it.managed === 'trash' ? 'TRASH' : it.managed === 'ideas' ? 'IDEAS' : 'SELECTED'; fig.classList.remove('trashed','starred','idea'); return; }
+  const key = keyFor(it);
+  fig.classList.toggle('trashed', trashSet.has(key));
+  fig.classList.toggle('starred', starSet.has(key));
+  fig.classList.toggle('idea',    ideaSet.has(key));
+}
+function makeExclusive(toSet, o1, o2, key) { if (toSet.has(key)) toSet.delete(key); else { toSet.add(key); o1.delete(key); o2.delete(key); } }
+function toggleTrash(key, fig) { const it = itemByKey.get(key); if (isManaged(it)) return; makeExclusive(trashSet, starSet, ideaSet, key); applyItemClasses(fig, it); updateActionButtons(); updateCountersUI(); }
+function toggleStar(key, fig)  { const it = itemByKey.get(key); if (isManaged(it)) return; makeExclusive(starSet, trashSet, ideaSet, key);  applyItemClasses(fig, it); updateActionButtons(); updateCountersUI(); }
+function toggleIdea(key, fig)  { const it = itemByKey.get(key); if (isManaged(it)) return; makeExclusive(ideaSet, trashSet, starSet, key);   applyItemClasses(fig, it); updateActionButtons(); updateCountersUI(); }
+
+function renderPage(pageNum) {
+  revokeListURLs(); groupsEl.innerHTML = '';
+  if (!groups.length) { groupsEl.innerHTML = '<p style="padding:16px;color:#666">No hay imágenes cargadas.</p>'; return; }
+  const startIdx = (pageNum - 1) * BUCKETS_PER_PAGE;
+  groups.slice(startIdx, Math.min(startIdx + BUCKETS_PER_PAGE, groups.length)).forEach((g, iLocal) => {
+    const absIndex = startIdx + iLocal;
+    const allVisible = visibleItemsForBucket(absIndex);
+    const toRender = expressMode && allVisible.length > EXPRESS_MAX ? allVisible.slice(0, EXPRESS_MAX) : allVisible;
+    const remaining = allVisible.length - toRender.length;
+
+    const sectionFrag = groupTpl.content.cloneNode(true);
+    const section = sectionFrag.querySelector('.group');
+    section.dataset.absIndex = String(absIndex);
+    section.querySelector('.gtitle').textContent = `${fmtSpan(g.startTs, g.endTs)} · ${allVisible.length} foto(s)`;
+    const ghit = sectionFrag.querySelector('.ghit');
+    ghit.addEventListener('click', () => openBucket(absIndex));
+    ghit.addEventListener('keydown', ev => { if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); openBucket(absIndex); } });
+    section.addEventListener('click', ev => { if (ev.target.closest('.ghit,.btn-trash,.btn-star,.btn-idea,figure.item')) return; listMode = 'bucket'; setSelectedBucket(absIndex); updateListSelectionUI(); });
+    const grid = sectionFrag.querySelector('.grid');
+
+    for (const it of toRender) {
+      const node = itemTpl.content.cloneNode(true);
+      const fig = node.querySelector('.item');
+      const img = node.querySelector('img');
+      const cap = node.querySelector('.caption');
+      const btnRotate = node.querySelector('.btn-rotate');
+      const btnDupes  = node.querySelector('.btn-dupes');
+      const btnTrash  = node.querySelector('.btn-trash');
+      const btnStar   = node.querySelector('.btn-star');
+      const btnIdea   = node.querySelector('.btn-idea');
+      img.alt = it.name; cap.textContent = it.name;
+      getDisplayURL(it, 'list').then(url => { img.src = url; }).catch(() => { img.alt = it.name + ' (sin preview)'; });
+      applyItemClasses(fig, it);
+      if (btnRotate) {
+        if (!isManaged(it) && isJpeg(it)) {
+          btnRotate.addEventListener('click', async e => {
+            e.stopPropagation();
+            try { await rotateJpeg90cw(it); const newUrl = await getDisplayURL(it, 'list'); img.src = ''; img.src = newUrl; progressEl.textContent = `Rotada: ${it.name}`; }
+            catch (err) { progressEl.textContent = `Error al rotar: ${err.message}`; }
+          });
+        } else { btnRotate.style.display = 'none'; }
+      }
+      if (btnDupes) {
+        if (!isManaged(it)) {
+          btnDupes.addEventListener('click', async e => { e.stopPropagation(); await findDuplicates(it); });
+        } else { btnDupes.style.display = 'none'; }
+      }
+      if (!isManaged(it)) {
+        const key = keyFor(it);
+        btnTrash.setAttribute('aria-pressed', trashSet.has(key) + '');
+        btnStar .setAttribute('aria-pressed', starSet.has(key)  + '');
+        btnIdea .setAttribute('aria-pressed', ideaSet.has(key)  + '');
+        const sync = () => { btnTrash.setAttribute('aria-pressed', trashSet.has(key)+''); btnStar.setAttribute('aria-pressed', starSet.has(key)+''); btnIdea.setAttribute('aria-pressed', ideaSet.has(key)+''); };
+        btnTrash.addEventListener('click', e => { e.stopPropagation(); toggleTrash(key, fig); sync(); });
+        btnStar .addEventListener('click', e => { e.stopPropagation(); toggleStar(key, fig);  sync(); });
+        btnIdea .addEventListener('click', e => { e.stopPropagation(); toggleIdea(key, fig);  sync(); });
+      } else { btnRotate?.remove(); btnDupes?.remove(); btnTrash.remove(); btnStar.remove(); btnIdea.remove(); }
+      grid.appendChild(node);
+    }
+
+    if (remaining > 0) {
+      const more = document.createElement('div');
+      more.className = 'item-more';
+      more.innerHTML = `<span class="more-count">+${remaining}</span><span class="more-label">fotos más</span><span class="more-label">Abrir bucket para ver todas</span>`;
+      more.addEventListener('click', () => openBucket(absIndex));
+      grid.appendChild(more);
+    }
+    groupsEl.appendChild(sectionFrag);
+  });
+}
+
+/* ---------- Selección en lista ---------- */
+function ensureBucketVisible(absIndex) { const tp = Math.floor(absIndex / BUCKETS_PER_PAGE) + 1; if (tp !== currentPage) goToPage(tp); else updateListSelectionUI(); }
+function getBucketSection(absIndex) { return groupsEl.querySelector(`.group[data-abs-index="${absIndex}"]`); }
+function getBucketGrid(absIndex) { const s = getBucketSection(absIndex); return s ? s.querySelector('.grid') : null; }
+function setSelectedBucket(absIndex) { selBucketAbsIndex = clamp(absIndex, 0, groups.length - 1); ensureBucketVisible(selBucketAbsIndex); getBucketSection(selBucketAbsIndex)?.scrollIntoView({ block: 'nearest' }); }
+function getGridCols(container) { const ch = Array.from(container?.children || []); if (ch.length <= 1) return 1; const top0 = ch[0].offsetTop; let cols = 0; for (const el of ch) { if (el.offsetTop !== top0) break; cols++; } return Math.max(1, cols); }
+function setSelectedPhoto(newIdx) { const vis = visibleItemsForBucket(selBucketAbsIndex); if (!vis.length) return; selPhotoIndex = clamp(newIdx, 0, vis.length - 1); updateListSelectionUI(true); getBucketGrid(selBucketAbsIndex)?.children[selPhotoIndex]?.scrollIntoView({ block: 'nearest' }); }
+function clearAllListSelections() { groupsEl.querySelectorAll('.group').forEach(s => { s.classList.remove('bucket-selected','photo-mode'); s.querySelectorAll('.item.selected').forEach(f => f.classList.remove('selected')); }); }
+function updateListSelectionUI(onlyPhoto = false) {
+  const sec = getBucketSection(selBucketAbsIndex);
+  if (!onlyPhoto) clearAllListSelections();
+  if (sec) {
+    sec.classList.add('bucket-selected');
+    if (listMode === 'photo') sec.classList.add('photo-mode');
+    const grid = sec.querySelector('.grid');
+    grid?.querySelectorAll('.item.selected').forEach(f => f.classList.remove('selected'));
+    if (listMode === 'photo') { const vis = visibleItemsForBucket(selBucketAbsIndex); if (!vis.length) return; const fig = grid?.children[selPhotoIndex]; if (fig?.classList?.contains('item')) fig.classList.add('selected'); }
+  }
+}
+
 /* ---------- Overlay ---------- */
 function openBucket(index) {
   currentOverlayIndex = clamp(index, 0, groups.length - 1); lastOpenAbsIndex = currentOverlayIndex;
@@ -570,7 +588,7 @@ function openBucket(index) {
 function hideOverlay(skipFocusReturn = false) {
   overlay.hidden = true; overlay.setAttribute('aria-hidden', 'true');
   revokeOverlayURLs(); closeViewer();
-  if (lastOpenAbsIndex !== null) { goToPage(Math.floor(lastOpenAbsIndex / BUCKETS_PER_PAGE) + 1); listMode = 'bucket'; setSelectedBucket(lastOpenAbsIndex); }
+  if (!skipFocusReturn && lastOpenAbsIndex !== null) { goToPage(Math.floor(lastOpenAbsIndex / BUCKETS_PER_PAGE) + 1); listMode = 'bucket'; setSelectedBucket(lastOpenAbsIndex); }
   currentOverlayIndex = null; overlayEdgeIntent = null; updateCountersUI();
 }
 function getOverlayFig(idx) { return overlayGrid.children[idx] || null; }
@@ -605,6 +623,7 @@ function renderOverlay() {
     const img = node.querySelector('img');
     const cap = node.querySelector('.caption');
     const btnRotate = node.querySelector('.btn-rotate');
+    const btnDupes  = node.querySelector('.btn-dupes');
     const btnTrash  = node.querySelector('.btn-trash');
     const btnStar   = node.querySelector('.btn-star');
     const btnIdea   = node.querySelector('.btn-idea');
@@ -612,27 +631,16 @@ function renderOverlay() {
     getDisplayURL(it, 'overlay').then(url => { img.src = url; }).catch(() => { img.alt = it.name + ' (sin preview)'; });
     applyItemClasses(fig, it);
 
-    // Botón rotar — solo JPEG no gestionado
     if (btnRotate) {
       if (!isManaged(it) && isJpeg(it)) {
-        btnRotate.addEventListener('click', async e => {
-          e.stopPropagation(); setOverlaySelected(idx);
-          await rotateSelected();
-        });
+        btnRotate.addEventListener('click', async e => { e.stopPropagation(); setOverlaySelected(idx); await rotateSelected(); });
       } else { btnRotate.style.display = 'none'; }
     }
-
-    // Botón duplicados
-    const btnDupes = node.querySelector('.btn-dupes');
     if (btnDupes) {
       if (!isManaged(it)) {
-        btnDupes.addEventListener('click', async e => {
-          e.stopPropagation(); setOverlaySelected(idx);
-          await findDuplicates(it);
-        });
+        btnDupes.addEventListener('click', async e => { e.stopPropagation(); setOverlaySelected(idx); await findDuplicates(it); });
       } else { btnDupes.style.display = 'none'; }
     }
-
     if (!isManaged(it)) {
       const key = keyFor(it);
       btnTrash.setAttribute('aria-pressed', trashSet.has(key) + '');
@@ -642,7 +650,7 @@ function renderOverlay() {
       btnTrash.addEventListener('click', e => { e.stopPropagation(); toggleTrash(key, fig); syncOverlayAria(idx); updateViewerButtonsState(); });
       btnStar .addEventListener('click', e => { e.stopPropagation(); toggleStar(key, fig);  syncOverlayAria(idx); updateViewerButtonsState(); });
       btnIdea .addEventListener('click', e => { e.stopPropagation(); toggleIdea(key, fig);  syncOverlayAria(idx); updateViewerButtonsState(); });
-    } else { btnRotate?.remove(); btnTrash.remove(); btnStar.remove(); btnIdea.remove(); fig.addEventListener('click', () => setOverlaySelected(idx)); }
+    } else { btnRotate?.remove(); btnDupes?.remove(); btnTrash.remove(); btnStar.remove(); btnIdea.remove(); fig.addEventListener('click', () => setOverlaySelected(idx)); }
     overlayGrid.appendChild(node);
   });
   if (vis.length > 0) setOverlaySelected(Math.min(overlaySelIdx, vis.length - 1));
@@ -732,11 +740,8 @@ toggleManagedBtn.addEventListener('click', () => {
   updatePagerState(); renderPage(currentPage); updateListSelectionUI();
   if (!overlay.hidden && currentOverlayIndex !== null) { const vis = currentVisibleOverlayItems(); overlaySelIdx = Math.min(overlaySelIdx, Math.max(0, vis.length - 1)); renderOverlay(); }
 });
-
 toggleExpressBtn.addEventListener('click', () => {
-  expressMode = !expressMode;
-  toggleExpressBtn.classList.toggle('is-on', expressMode);
-  renderPage(currentPage);
+  expressMode = !expressMode; toggleExpressBtn.classList.toggle('is-on', expressMode); renderPage(currentPage);
 });
 document.querySelectorAll('.btn-mins').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -761,6 +766,7 @@ prevBtn .addEventListener('click', () => goToPage(currentPage - 1));
 nextBtn .addEventListener('click', () => goToPage(currentPage + 1));
 lastBtn .addEventListener('click', () => goToPage(totalPages()));
 pageInput.addEventListener('change', () => { const n = parseInt(pageInput.value || '1', 10); goToPage(isNaN(n) ? 1 : n); });
+dupesClose.addEventListener('click', () => { dupesPanel.hidden = true; dupesList.innerHTML = ''; });
 
 /* ---------- Teclado ---------- */
 function isOverlayOpen() { return !overlay.hidden; }
@@ -821,7 +827,6 @@ function viewerKeydown(e) {
 }
 
 /* ---------- Botones overlay ---------- */
-dupesClose.addEventListener('click', () => { dupesPanel.hidden = true; dupesList.innerHTML = ''; });
 overlayClose.addEventListener('click', () => hideOverlay());
 overlayPrev.addEventListener('click', () => { if (currentOverlayIndex > 0) { currentOverlayIndex--; overlaySelIdx = 0; overlayEdgeIntent = null; renderOverlay(); } });
 overlayNext.addEventListener('click', () => { if (currentOverlayIndex < groups.length - 1) { currentOverlayIndex++; overlaySelIdx = 0; overlayEdgeIntent = null; renderOverlay(); } });
@@ -835,5 +840,5 @@ viewerBtnIdea .addEventListener('click', () => { const vis = currentVisibleOverl
 renderPage(currentPage); updateListSelectionUI(); updateActionButtons(); updateCountersUI();
 toggleManagedBtn.classList.toggle('is-on', showManaged);
 toggleExpressBtn.classList.toggle('is-on', expressMode);
-openPhashDB().catch(() => {}); // silencioso si falla
+openPhashDB().catch(() => {});
 Object.assign(window, { allItems, groups, openBucket, moveMarkedToTrash, moveMarkedToIdeas, moveMarkedToSelected });
