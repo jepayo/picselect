@@ -303,7 +303,19 @@ async function getPHashForItem(it) {
   return hash;
 }
 
+let showManagedBeforeDupes = true;
+
 async function findDuplicates(srcItem) {
+  // Forzar mostrar gestionadas durante la búsqueda
+  showManagedBeforeDupes = showManaged;
+  if (!showManaged) {
+    showManaged = true;
+    toggleManagedBtn.classList.add('is-on');
+    buildGroups();
+    updatePagerState();
+    renderPage(currentPage);
+  }
+
   dupesPanel.hidden = false;
   dupesList.innerHTML = '<div class="dupes-searching">Iniciando…</div>';
   await new Promise(r => requestAnimationFrame(r));
@@ -340,6 +352,12 @@ async function findDuplicates(srcItem) {
 
   results.sort((a, b) => a.dist - b.dist);
   const top5 = results.slice(0, 5);
+
+  console.log('allItems.length al ordenar:', allItems.length);
+  for (const { it } of top5) {
+    const found = allItems.find(x => keyFor(x) === keyFor(it));
+    console.log('top5:', it.name, 'ts:', it.ts, 'en allItems:', !!found, 'en groups:', groups.findIndex(g => g.items.some(x => keyFor(x) === keyFor(it))));
+  }
 
   progressEl.textContent = `Búsqueda completada · mostrando las 5 fotos más parecidas`;
   dupesList.innerHTML = '';
@@ -766,7 +784,18 @@ prevBtn .addEventListener('click', () => goToPage(currentPage - 1));
 nextBtn .addEventListener('click', () => goToPage(currentPage + 1));
 lastBtn .addEventListener('click', () => goToPage(totalPages()));
 pageInput.addEventListener('change', () => { const n = parseInt(pageInput.value || '1', 10); goToPage(isNaN(n) ? 1 : n); });
-dupesClose.addEventListener('click', () => { dupesPanel.hidden = true; dupesList.innerHTML = ''; });
+dupesClose.addEventListener('click', () => {
+  dupesPanel.hidden = true;
+  dupesList.innerHTML = '';
+  // Restaurar estado de showManaged
+  if (!showManagedBeforeDupes && showManaged) {
+    showManaged = false;
+    toggleManagedBtn.classList.remove('is-on');
+    buildGroups();
+    updatePagerState();
+    renderPage(currentPage);
+  }
+});
 
 /* ---------- Teclado ---------- */
 function isOverlayOpen() { return !overlay.hidden; }
