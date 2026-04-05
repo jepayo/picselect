@@ -261,8 +261,6 @@ function renderPage(pageNum) {
       const btnTrash  = node.querySelector('.btn-trash');
       const btnStar   = node.querySelector('.btn-star');
       const btnIdea   = node.querySelector('.btn-idea');
-      const btnStar   = node.querySelector('.btn-star');
-      const btnIdea   = node.querySelector('.btn-idea');
       img.alt = it.name; cap.textContent = it.name;
       getDisplayURL(it, 'list').then(url => { img.src = url; }).catch(() => { img.alt = it.name + ' (sin preview)'; });
       applyItemClasses(fig, it);
