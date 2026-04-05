@@ -326,7 +326,35 @@ function updateListSelectionUI(onlyPhoto = false) {
 /* ---------- pHash — duplicados ---------- */
 const PHASH_SIZE = 32;
 const DCT_SIZE   = 8;
-const pHashCache = new Map(); // key -> BigInt hash
+const pHashCache = new Map(); // key -> BigInt hash (memoria sesión)
+
+/* IndexedDB para persistir hashes entre sesiones */
+let phashDB = null;
+function openPhashDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('phash_cache', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('hashes', { keyPath: 'k' });
+    req.onsuccess = e => { phashDB = e.target.result; res(phashDB); };
+    req.onerror = () => rej(req.error);
+  });
+}
+async function dbGetHash(key) {
+  if (!phashDB) return null;
+  return new Promise(res => {
+    const tx = phashDB.transaction('hashes', 'readonly');
+    const req = tx.objectStore('hashes').get(key);
+    req.onsuccess = () => res(req.result ? BigInt('0x' + req.result.h) : null);
+    req.onerror = () => res(null);
+  });
+}
+async function dbSetHash(key, hash) {
+  if (!phashDB) return;
+  return new Promise(res => {
+    const tx = phashDB.transaction('hashes', 'readwrite');
+    tx.objectStore('hashes').put({ k: key, h: hash.toString(16) });
+    tx.oncomplete = res; tx.onerror = res;
+  });
+}
 
 function dct8(row) {
   const N = 8, out = new Float64Array(N);
@@ -382,15 +410,28 @@ function hammingDistance(a, b) {
   return d;
 }
 
-async function getPHashForItem(it, level = 'list') {
+async function getPHashForItem(it) {
   const key = keyFor(it);
+
+  // 1. Memoria de sesión
   if (pHashCache.has(key)) return pHashCache.get(key);
-  const url = await getDisplayURL(it, level);
+
+  // 2. IndexedDB (sesiones anteriores)
+  const cached = await dbGetHash(key);
+  if (cached !== null) { pHashCache.set(key, cached); return cached; }
+
+  // 3. Calcular
+  const url = URL.createObjectURL(isHeicFile(it.file)
+    ? await enqueueHeicConversion(it.file)
+    : it.file);
   const img = await new Promise((res, rej) => {
     const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url;
   });
+  URL.revokeObjectURL(url);
+
   const hash = computePHash(img);
   pHashCache.set(key, hash);
+  dbSetHash(key, hash); // guardar async, sin bloquear
   return hash;
 }
 
@@ -406,7 +447,7 @@ async function findDuplicates(srcItem) {
     try {
       const h = await getPHashForItem(it);
       const dist = hammingDistance(srcHash, h);
-      if (dist <= 10) results.push({ it, dist });
+      results.push({ it, dist }); // todas, sin filtro de umbral
     } catch (_) {}
   }
 
@@ -423,8 +464,9 @@ async function findDuplicates(srcItem) {
     // Encontrar qué bucket contiene este item
     const bucketIdx = groups.findIndex(g => g.items.includes(it));
 
+    const similarity = dist === 0 ? 'Idéntica' : dist <= 5 ? 'Muy parecida' : dist <= 10 ? 'Parecida' : 'Lejana';
     const div = document.createElement('div');
-    div.className = 'dupe-item ' + (dist === 0 ? 'dupe-dist-0' : dist <= 5 ? 'dupe-dist-low' : 'dupe-dist-mid');
+    div.className = 'dupe-item ' + (dist === 0 ? 'dupe-dist-0' : dist <= 5 ? 'dupe-dist-low' : dist <= 10 ? 'dupe-dist-mid' : '');
 
     const img = document.createElement('img');
     getDisplayURL(it, 'list').then(u => { img.src = u; }).catch(() => {});
@@ -433,7 +475,7 @@ async function findDuplicates(srcItem) {
     info.className = 'dupe-info';
     info.innerHTML = `
       <span class="dupe-name" title="${it.name}">${it.name}</span>
-      <span class="dupe-meta">Distancia: ${dist} · Bucket ${bucketIdx + 1}</span>
+      <span class="dupe-meta">${similarity} · distancia ${dist} · Bucket ${bucketIdx + 1}</span>
       <span class="dupe-meta">${new Date(it.ts).toLocaleString()}</span>
     `;
 
@@ -788,4 +830,5 @@ viewerBtnIdea .addEventListener('click', () => { const vis = currentVisibleOverl
 renderPage(currentPage); updateListSelectionUI(); updateActionButtons(); updateCountersUI();
 toggleManagedBtn.classList.toggle('is-on', showManaged);
 toggleExpressBtn.classList.toggle('is-on', expressMode);
+openPhashDB().catch(() => {}); // silencioso si falla
 Object.assign(window, { allItems, groups, openBucket, moveMarkedToTrash, moveMarkedToIdeas, moveMarkedToSelected });
