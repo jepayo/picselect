@@ -31,7 +31,9 @@ const viewerCaption   = document.getElementById('viewerCaption');
 const viewerBtnTrash  = document.getElementById('viewerTrash');
 const viewerBtnStar   = document.getElementById('viewerStar');
 const viewerBtnIdea   = document.getElementById('viewerIdea');
-const groupTpl        = document.getElementById('groupTpl');
+const dupesPanel = document.getElementById('dupesPanel');
+const dupesList  = document.getElementById('dupesList');
+const dupesClose = document.getElementById('dupesClose');
 const itemTpl         = document.getElementById('itemTpl');
 
 /* ---------- Estado ---------- */
@@ -255,6 +257,7 @@ function renderPage(pageNum) {
       const img = node.querySelector('img');
       const cap = node.querySelector('.caption');
       const btnRotate = node.querySelector('.btn-rotate');
+      const btnDupes  = node.querySelector('.btn-dupes');
       const btnTrash  = node.querySelector('.btn-trash');
       const btnStar   = node.querySelector('.btn-star');
       const btnIdea   = node.querySelector('.btn-idea');
@@ -317,6 +320,136 @@ function updateListSelectionUI(onlyPhoto = false) {
     const grid = sec.querySelector('.grid');
     grid?.querySelectorAll('.item.selected').forEach(f => f.classList.remove('selected'));
     if (listMode === 'photo') { const vis = visibleItemsForBucket(selBucketAbsIndex); if (!vis.length) return; const fig = grid?.children[selPhotoIndex]; if (fig?.classList?.contains('item')) fig.classList.add('selected'); }
+  }
+}
+
+/* ---------- pHash — duplicados ---------- */
+const PHASH_SIZE = 32;
+const DCT_SIZE   = 8;
+const pHashCache = new Map(); // key -> BigInt hash
+
+function dct8(row) {
+  const N = 8, out = new Float64Array(N);
+  for (let k = 0; k < N; k++) {
+    let s = 0;
+    for (let n = 0; n < N; n++) s += row[n] * Math.cos(Math.PI * k * (2*n+1) / (2*N));
+    out[k] = (k === 0 ? Math.SQRT1_2 : 1) * s;
+  }
+  return out;
+}
+
+function computePHash(imgEl) {
+  const c = document.createElement('canvas');
+  c.width = c.height = PHASH_SIZE;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(imgEl, 0, 0, PHASH_SIZE, PHASH_SIZE);
+  const { data } = ctx.getImageData(0, 0, PHASH_SIZE, PHASH_SIZE);
+
+  // Grayscale
+  const gray = [];
+  for (let i = 0; i < PHASH_SIZE; i++) {
+    gray.push([]);
+    for (let j = 0; j < PHASH_SIZE; j++) {
+      const p = (i * PHASH_SIZE + j) * 4;
+      gray[i].push(0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2]);
+    }
+  }
+
+  // DCT 2D sobre bloque 8x8 top-left
+  const dctRows = gray.slice(0, DCT_SIZE).map(r => dct8(r.slice(0, DCT_SIZE)));
+  const dctCols = [];
+  for (let j = 0; j < DCT_SIZE; j++) {
+    const col = dctRows.map(r => r[j]);
+    dctCols.push(dct8(col));
+  }
+
+  // Aplanar (excluir [0,0] = DC)
+  const vals = [];
+  for (let i = 0; i < DCT_SIZE; i++)
+    for (let j = 0; j < DCT_SIZE; j++)
+      if (!(i===0 && j===0)) vals.push(dctCols[i][j]);
+
+  const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+  let hash = 0n;
+  for (let i = 0; i < vals.length; i++)
+    if (vals[i] >= mean) hash |= (1n << BigInt(i));
+  return hash;
+}
+
+function hammingDistance(a, b) {
+  let x = a ^ b, d = 0;
+  while (x) { d += Number(x & 1n); x >>= 1n; }
+  return d;
+}
+
+async function getPHashForItem(it, level = 'list') {
+  const key = keyFor(it);
+  if (pHashCache.has(key)) return pHashCache.get(key);
+  const url = await getDisplayURL(it, level);
+  const img = await new Promise((res, rej) => {
+    const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url;
+  });
+  const hash = computePHash(img);
+  pHashCache.set(key, hash);
+  return hash;
+}
+
+async function findDuplicates(srcItem) {
+  dupesPanel.hidden = false;
+  dupesList.innerHTML = '<div class="dupes-searching">Calculando…</div>';
+
+  const srcHash = await getPHashForItem(srcItem);
+  const results = [];
+
+  for (const it of allItems) {
+    if (keyFor(it) === keyFor(srcItem)) continue;
+    try {
+      const h = await getPHashForItem(it);
+      const dist = hammingDistance(srcHash, h);
+      if (dist <= 10) results.push({ it, dist });
+    } catch (_) {}
+  }
+
+  results.sort((a, b) => a.dist - b.dist);
+  const top5 = results.slice(0, 5);
+
+  dupesList.innerHTML = '';
+  if (!top5.length) {
+    dupesList.innerHTML = '<div class="dupes-searching">No se encontraron duplicados.</div>';
+    return;
+  }
+
+  for (const { it, dist } of top5) {
+    // Encontrar qué bucket contiene este item
+    const bucketIdx = groups.findIndex(g => g.items.includes(it));
+
+    const div = document.createElement('div');
+    div.className = 'dupe-item ' + (dist === 0 ? 'dupe-dist-0' : dist <= 5 ? 'dupe-dist-low' : 'dupe-dist-mid');
+
+    const img = document.createElement('img');
+    getDisplayURL(it, 'list').then(u => { img.src = u; }).catch(() => {});
+
+    const info = document.createElement('div');
+    info.className = 'dupe-info';
+    info.innerHTML = `
+      <span class="dupe-name" title="${it.name}">${it.name}</span>
+      <span class="dupe-meta">Distancia: ${dist} · Bucket ${bucketIdx + 1}</span>
+      <span class="dupe-meta">${new Date(it.ts).toLocaleString()}</span>
+    `;
+
+    const btn = document.createElement('button');
+    btn.className = 'dupe-goto';
+    btn.textContent = `Ir →`;
+    btn.addEventListener('click', () => {
+      hideOverlay();
+      openBucket(bucketIdx);
+      // Seleccionar la foto específica dentro del bucket
+      const visIdx = visibleItemsForBucket(bucketIdx).indexOf(it);
+      if (visIdx >= 0) { overlaySelIdx = visIdx; setOverlaySelected(visIdx); }
+    });
+
+    div.appendChild(img); div.appendChild(info); div.appendChild(btn);
+    dupesList.appendChild(div);
   }
 }
 
@@ -440,6 +573,17 @@ function renderOverlay() {
           await rotateSelected();
         });
       } else { btnRotate.style.display = 'none'; }
+    }
+
+    // Botón duplicados
+    const btnDupes = node.querySelector('.btn-dupes');
+    if (btnDupes) {
+      if (!isManaged(it)) {
+        btnDupes.addEventListener('click', async e => {
+          e.stopPropagation(); setOverlaySelected(idx);
+          await findDuplicates(it);
+        });
+      } else { btnDupes.style.display = 'none'; }
     }
 
     if (!isManaged(it)) {
@@ -630,6 +774,7 @@ function viewerKeydown(e) {
 }
 
 /* ---------- Botones overlay ---------- */
+dupesClose.addEventListener('click', () => { dupesPanel.hidden = true; dupesList.innerHTML = ''; });
 overlayClose.addEventListener('click', () => hideOverlay());
 overlayPrev.addEventListener('click', () => { if (currentOverlayIndex > 0) { currentOverlayIndex--; overlaySelIdx = 0; overlayEdgeIntent = null; renderOverlay(); } });
 overlayNext.addEventListener('click', () => { if (currentOverlayIndex < groups.length - 1) { currentOverlayIndex++; overlaySelIdx = 0; overlayEdgeIntent = null; renderOverlay(); } });
