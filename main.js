@@ -303,19 +303,7 @@ async function getPHashForItem(it) {
   return hash;
 }
 
-let showManagedBeforeDupes = true;
-
 async function findDuplicates(srcItem) {
-  // Forzar mostrar gestionadas durante la búsqueda
-  showManagedBeforeDupes = showManaged;
-  if (!showManaged) {
-    showManaged = true;
-    toggleManagedBtn.classList.add('is-on');
-    buildGroups();
-    updatePagerState();
-    renderPage(currentPage);
-  }
-
   dupesPanel.hidden = false;
   dupesList.innerHTML = '<div class="dupes-searching">Iniciando…</div>';
   await new Promise(r => requestAnimationFrame(r));
@@ -392,6 +380,17 @@ async function findDuplicates(srcItem) {
     const targetIt = it;
     btn.addEventListener('click', () => {
       console.log('=== IR PULSADO ===');
+
+      // Forzar mostrar gestionadas antes de navegar
+      if (!showManaged) {
+        showManaged = true;
+        toggleManagedBtn.classList.add('is-on');
+        buildGroups();
+        updatePagerState();
+        renderPage(currentPage);
+      }
+
+      dupesPanel.hidden = true;
       const targetKey = keyFor(targetIt);
       console.log('TARGET KEY:', targetKey);
       console.log('TARGET NAME:', targetIt.name, 'TS:', targetIt.ts);
@@ -787,14 +786,6 @@ pageInput.addEventListener('change', () => { const n = parseInt(pageInput.value 
 dupesClose.addEventListener('click', () => {
   dupesPanel.hidden = true;
   dupesList.innerHTML = '';
-  // Restaurar estado de showManaged
-  if (!showManagedBeforeDupes && showManaged) {
-    showManaged = false;
-    toggleManagedBtn.classList.remove('is-on');
-    buildGroups();
-    updatePagerState();
-    renderPage(currentPage);
-  }
 });
 
 /* ---------- Teclado ---------- */
@@ -870,4 +861,10 @@ renderPage(currentPage); updateListSelectionUI(); updateActionButtons(); updateC
 toggleManagedBtn.classList.toggle('is-on', showManaged);
 toggleExpressBtn.classList.toggle('is-on', expressMode);
 openPhashDB().catch(() => {});
-Object.assign(window, { allItems, groups, openBucket, moveMarkedToTrash, moveMarkedToIdeas, moveMarkedToSelected });
+Object.assign(window, {
+  getAllItems: () => allItems,
+  getGroups: () => groups,
+  getPHashCache: () => pHashCache,
+  getPhashDB: () => phashDB,
+  openBucket, moveMarkedToTrash, moveMarkedToIdeas, moveMarkedToSelected
+});
