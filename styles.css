@@ -110,9 +110,40 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 .mark .icon { width: 18px; height: 18px; display: block; }
 
 .btn-rotate { top: 6px; left: 6px; }
-.btn-trash  { top: 6px; right: 6px; }
+.btn-dupes  { top: 36px; left: 6px; }
 .btn-star   { bottom: 6px; left: 6px; }
 .btn-idea   { bottom: 6px; right: 6px; }
+
+/* Panel duplicados flotante */
+.dupes-panel {
+  position: fixed; bottom: 24px; right: 24px; z-index: 10200;
+  width: 300px; background: #fff; border-radius: 12px;
+  border: 1px solid #e0e0e0; box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.dupes-panel[hidden] { display: none !important; }
+.dupes-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: #f7f7f7; border-bottom: 1px solid #eee;
+}
+.dupes-title { font-size: 13px; font-weight: 700; color: #333; }
+.dupes-header button { background: none; border: none; cursor: pointer; font-size: 16px; color: #888; padding: 0 4px; }
+.dupes-header button:hover { color: #333; }
+.dupes-list { overflow-y: auto; max-height: 420px; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.dupe-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px; border-radius: 8px; border: 1px solid #eee; background: #fafafa;
+}
+.dupe-item img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; background: #ddd; flex-shrink: 0; }
+.dupe-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dupe-name { font-size: 12px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dupe-meta { font-size: 11px; color: #888; }
+.dupe-dist-0 { border-left: 3px solid #1a73e8; }
+.dupe-dist-low { border-left: 3px solid #2e7d32; }
+.dupe-dist-mid { border-left: 3px solid #f4b400; }
+.dupe-goto { font-size: 11px; font-weight: 700; color: #1a73e8; background: #e8f0fe; border: none; border-radius: 999px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+.dupe-goto:hover { background: #c5d8fb; }
+.dupes-searching { padding: 16px; text-align: center; font-size: 13px; color: #888; }
 
 .item.trashed .btn-trash { background: #ffefef; border-color: #f5b5b5; color: #c62828; }
 .item.starred .btn-star  { background: #fff8e1; border-color: #f7d27a; color: #f4b400; }
