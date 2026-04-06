@@ -145,6 +145,20 @@ h1 { margin: 0 0 12px; font-size: 20px; }
 .dupe-goto:hover { background: #c5d8fb; }
 .dupes-searching { padding: 16px; text-align: center; font-size: 13px; color: #888; }
 
+/* Foto origen en panel */
+.dupe-src-header {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px; border-bottom: 1px solid #eee; background: #f7f7f7;
+}
+.dupe-src-img {
+  width: 120px; height: 120px; object-fit: cover; border-radius: 8px;
+  border: 2px solid #1a73e8; background: #ddd;
+}
+.dupe-src-label {
+  font-size: 11px; color: #666; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+
 .item.trashed .btn-trash { background: #ffefef; border-color: #f5b5b5; color: #c62828; }
 .item.starred .btn-star  { background: #fff8e1; border-color: #f7d27a; color: #f4b400; }
 .item.idea    .btn-idea  { background: #e9f9ef; border-color: #bfe8cc; color: #1b7f3a; }
