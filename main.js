@@ -179,6 +179,17 @@ async function loadEntriesWithHandles(entries) {
   progressEl.textContent = `Listo: ${allItems.length} fotos → ${groups.length} buckets`;
   listMode = 'bucket'; selBucketAbsIndex = 0; selPhotoIndex = 0;
   updateListSelectionUI(); updateActionButtons(); updateCountersUI();
+
+  // Precalcular hashes en background
+  (async () => {
+    let n = 0;
+    for (const it of allItems) {
+      try { await getPHashForItem(it); n++; }
+      catch (_) {}
+      if (n % 50 === 0) progressEl.textContent = `Precalculando hashes… ${n} / ${allItems.length}`;
+    }
+    progressEl.textContent = `Listo: ${allItems.length} fotos · hashes calculados`;
+  })();
 }
 function resetState(clearRoot = true) {
   revokeListURLs(); revokeOverlayURLs();
@@ -305,17 +316,35 @@ async function getPHashForItem(it) {
 
 async function findDuplicates(srcItem) {
   dupesPanel.hidden = false;
-  dupesList.innerHTML = '<div class="dupes-searching">Iniciando…</div>';
+
+  // Mostrar miniatura de la foto origen
+  dupesList.innerHTML = '';
+  const srcHeader = document.createElement('div');
+  srcHeader.className = 'dupe-src-header';
+  const srcImg = document.createElement('img');
+  srcImg.className = 'dupe-src-img';
+  getDisplayURL(srcItem, 'list').then(u => { srcImg.src = u; }).catch(() => {});
+  const srcLabel = document.createElement('div');
+  srcLabel.className = 'dupe-src-label';
+  srcLabel.textContent = `Buscando similares a: ${srcItem.name}`;
+  srcHeader.appendChild(srcImg);
+  srcHeader.appendChild(srcLabel);
+  dupesList.appendChild(srcHeader);
+
+  const searching = document.createElement('div');
+  searching.className = 'dupes-searching';
+  searching.textContent = 'Iniciando…';
+  dupesList.appendChild(searching);
   await new Promise(r => requestAnimationFrame(r));
   await new Promise(r => requestAnimationFrame(r));
 
-  dupesList.innerHTML = '<div class="dupes-searching">Calculando hash de la foto…</div>';
+  searching.textContent = 'Calculando hash de la foto…';
   await new Promise(r => requestAnimationFrame(r));
   await new Promise(r => requestAnimationFrame(r));
 
   let srcHash;
   try { srcHash = await getPHashForItem(srcItem); }
-  catch (err) { dupesList.innerHTML = `<div class="dupes-searching">Error: ${err.message}</div>`; return; }
+  catch (err) { searching.textContent = `Error: ${err.message}`; return; }
 
   const total = allItems.length;
   const results = [];
@@ -324,7 +353,7 @@ async function findDuplicates(srcItem) {
     const it = allItems[i];
     if (keyFor(it) === keyFor(srcItem)) continue;
     if (i % 10 === 0) {
-      dupesList.innerHTML = `<div class="dupes-searching">Calculando hash ${i + 1} de ${total}…</div>`;
+      searching.textContent = `Calculando hash ${i + 1} de ${total}…`;
       await new Promise(r => requestAnimationFrame(r));
       await new Promise(r => requestAnimationFrame(r));
     }
@@ -334,7 +363,7 @@ async function findDuplicates(srcItem) {
     } catch (_) {}
   }
 
-  dupesList.innerHTML = `<div class="dupes-searching">Ordenando resultados…</div>`;
+  searching.textContent = 'Ordenando resultados…';
   await new Promise(r => requestAnimationFrame(r));
   await new Promise(r => requestAnimationFrame(r));
 
@@ -348,10 +377,13 @@ async function findDuplicates(srcItem) {
   }
 
   progressEl.textContent = `Búsqueda completada · mostrando las 5 fotos más parecidas`;
-  dupesList.innerHTML = '';
+  searching.remove(); // quitar solo el mensaje, mantener header
 
   if (!top5.length) {
-    dupesList.innerHTML = '<div class="dupes-searching">No hay otras fotos para comparar.</div>';
+    const empty = document.createElement('div');
+    empty.className = 'dupes-searching';
+    empty.textContent = 'No hay otras fotos para comparar.';
+    dupesList.appendChild(empty);
     return;
   }
 
@@ -390,7 +422,7 @@ async function findDuplicates(srcItem) {
         renderPage(currentPage);
       }
 
-      dupesPanel.hidden = true;
+      // NO cerrar el panel — el usuario puede seguir navegando
       const targetKey = keyFor(targetIt);
       console.log('TARGET KEY:', targetKey);
       console.log('TARGET NAME:', targetIt.name, 'TS:', targetIt.ts);
