@@ -180,15 +180,15 @@ async function loadEntriesWithHandles(entries) {
   listMode = 'bucket'; selBucketAbsIndex = 0; selPhotoIndex = 0;
   updateListSelectionUI(); updateActionButtons(); updateCountersUI();
 
-  // Precalcular hashes en background
+  // Precalcular hashes en background (esperar a que DB esté lista)
   (async () => {
+    if (!phashDB) { try { await openPhashDB(); } catch (_) {} }
     let n = 0;
     for (const it of allItems) {
-      try { await getPHashForItem(it); n++; }
-      catch (_) {}
+      try { await getPHashForItem(it); n++; } catch (_) {}
       if (n % 50 === 0) progressEl.textContent = `Precalculando hashes… ${n} / ${allItems.length}`;
     }
-    progressEl.textContent = `Listo: ${allItems.length} fotos · hashes calculados`;
+    progressEl.textContent = `Listo: ${allItems.length} fotos · ${n} hashes calculados`;
   })();
 }
 function resetState(clearRoot = true) {
@@ -413,7 +413,6 @@ async function findDuplicates(srcItem) {
     btn.addEventListener('click', () => {
       console.log('=== IR PULSADO ===');
 
-      // Forzar mostrar gestionadas antes de navegar
       if (!showManaged) {
         showManaged = true;
         toggleManagedBtn.classList.add('is-on');
@@ -421,8 +420,6 @@ async function findDuplicates(srcItem) {
         updatePagerState();
         renderPage(currentPage);
       }
-
-      // NO cerrar el panel — el usuario puede seguir navegando
       const targetKey = keyFor(targetIt);
       console.log('TARGET KEY:', targetKey);
       console.log('TARGET NAME:', targetIt.name, 'TS:', targetIt.ts);
@@ -889,10 +886,10 @@ viewerBtnStar .addEventListener('click', () => { const vis = currentVisibleOverl
 viewerBtnIdea .addEventListener('click', () => { const vis = currentVisibleOverlayItems(); const it = vis[overlaySelIdx]; if (!it || isManaged(it)) return; toggleIdea(keyFor(it),  overlayGrid.children[overlaySelIdx]); syncOverlayAria(overlaySelIdx); updateViewerButtonsState(); });
 
 /* ---------- Inicial ---------- */
+openPhashDB().catch(() => {});
 renderPage(currentPage); updateListSelectionUI(); updateActionButtons(); updateCountersUI();
 toggleManagedBtn.classList.toggle('is-on', showManaged);
 toggleExpressBtn.classList.toggle('is-on', expressMode);
-openPhashDB().catch(() => {});
 Object.assign(window, {
   getAllItems: () => allItems,
   getGroups: () => groups,
