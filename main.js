@@ -425,8 +425,6 @@ async function findDuplicates(srcItem) {
       console.log('TARGET NAME:', targetIt.name, 'TS:', targetIt.ts);
       console.log('GROUPS COUNT:', groups.length);
 
-      dupesPanel.hidden = true;
-
       if (!overlay.hidden) {
         overlay.hidden = true;
         overlay.setAttribute('aria-hidden', 'true');
