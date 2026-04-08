@@ -231,8 +231,9 @@ function revokeOverlayURLs() { for (const u of activeOverlayURLs) URL.revokeObje
 
 /* ---------- pHash — similares ---------- */
 const PHASH_SIZE = 32;
-const DCT_SIZE   = 8;
+const DCT_SIZE   = 16; // aumentado de 8 a 16 para más detalle
 const pHashCache = new Map();
+const histCache  = new Map(); // key -> Float32Array histograma
 
 let phashDB = null;
 function openPhashDB() {
@@ -261,7 +262,7 @@ async function dbSetHash(key, hash) {
   });
 }
 function dct8(row) {
-  const N = 8, out = new Float64Array(N);
+  const N = row.length, out = new Float64Array(N);
   for (let k = 0; k < N; k++) {
     let s = 0;
     for (let n = 0; n < N; n++) s += row[n] * Math.cos(Math.PI * k * (2*n+1) / (2*N));
@@ -283,6 +284,7 @@ function computePHash(imgEl) {
       gray[i].push(0.299*data[p] + 0.587*data[p+1] + 0.114*data[p+2]);
     }
   }
+  // DCT 2D sobre bloque DCT_SIZE x DCT_SIZE
   const dctRows = gray.slice(0, DCT_SIZE).map(r => dct8(r.slice(0, DCT_SIZE)));
   const dctCols = [];
   for (let j = 0; j < DCT_SIZE; j++) dctCols.push(dct8(dctRows.map(r => r[j])));
@@ -295,6 +297,53 @@ function computePHash(imgEl) {
   for (let i = 0; i < vals.length; i++) if (vals[i] >= mean) hash |= (1n << BigInt(i));
   return hash;
 }
+
+/* Histograma de color HSV normalizado — 16 bins H + 8 bins S + 8 bins V = 32 valores */
+function computeColorHistogram(imgEl) {
+  const size = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(imgEl, 0, 0, size, size);
+  const { data } = ctx.getImageData(0, 0, size, size);
+  const H_BINS = 16, S_BINS = 8, V_BINS = 8;
+  const hist = new Float32Array(H_BINS + S_BINS + V_BINS);
+  const n = size * size;
+  for (let i = 0; i < n; i++) {
+    const r = data[i*4]/255, g = data[i*4+1]/255, b = data[i*4+2]/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min;
+    const v = max;
+    const s = max === 0 ? 0 : d / max;
+    let h = 0;
+    if (d > 0) {
+      if (max === r) h = ((g-b)/d + 6) % 6;
+      else if (max === g) h = (b-r)/d + 2;
+      else h = (r-g)/d + 4;
+      h /= 6;
+    }
+    hist[Math.min(H_BINS-1, Math.floor(h * H_BINS))]++;
+    hist[H_BINS + Math.min(S_BINS-1, Math.floor(s * S_BINS))]++;
+    hist[H_BINS + S_BINS + Math.min(V_BINS-1, Math.floor(v * V_BINS))]++;
+  }
+  // Normalizar
+  for (let i = 0; i < hist.length; i++) hist[i] /= n;
+  return hist;
+}
+
+/* Distancia de histograma (0=idéntico, 1=completamente distinto) */
+function histogramDistance(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+  return sum / 2; // normalizado 0-1
+}
+
+/* Distancia combinada: 60% pHash + 40% histograma, devuelve 0-100 */
+function combinedDistance(hashA, hashB, histA, histB) {
+  const maxHamming = DCT_SIZE * DCT_SIZE - 1;
+  const normHamming = hammingDistance(hashA, hashB) / maxHamming;
+  const normHist    = histogramDistance(histA, histB);
+  return Math.round((normHamming * 0.6 + normHist * 0.4) * 100);
+}
 function hammingDistance(a, b) {
   let x = a ^ b, d = 0;
   while (x) { d += Number(x & 1n); x >>= 1n; }
@@ -302,15 +351,25 @@ function hammingDistance(a, b) {
 }
 async function getPHashForItem(it) {
   const key = keyFor(it);
-  if (pHashCache.has(key)) return pHashCache.get(key);
-  const cached = await dbGetHash(key);
-  if (cached !== null) { pHashCache.set(key, cached); return cached; }
-  const url = URL.createObjectURL(isHeicFile(it.file) ? await enqueueHeicConversion(it.file) : it.file);
-  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-  URL.revokeObjectURL(url);
-  const hash = computePHash(img);
+  if (pHashCache.has(key) && histCache.has(key)) return pHashCache.get(key);
+
+  // Intentar recuperar hash de IndexedDB
+  let hash = pHashCache.get(key) ?? null;
+  if (!hash) {
+    const cached = await dbGetHash(key);
+    if (cached !== null) hash = cached;
+  }
+
+  // Necesitamos la imagen para el histograma siempre (no se persiste en DB)
+  if (!histCache.has(key) || !hash) {
+    const url = URL.createObjectURL(isHeicFile(it.file) ? await enqueueHeicConversion(it.file) : it.file);
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    URL.revokeObjectURL(url);
+    if (!hash) { hash = computePHash(img); dbSetHash(key, hash); }
+    histCache.set(key, computeColorHistogram(img));
+  }
+
   pHashCache.set(key, hash);
-  dbSetHash(key, hash);
   return hash;
 }
 
@@ -359,7 +418,9 @@ async function findDuplicates(srcItem) {
     }
     try {
       const h = await getPHashForItem(it);
-      results.push({ it, dist: hammingDistance(srcHash, h) });
+      const hist = histCache.get(keyFor(it)) ?? new Float32Array(32);
+      const srcHist = histCache.get(keyFor(srcItem)) ?? new Float32Array(32);
+      results.push({ it, dist: combinedDistance(srcHash, h, srcHist, hist) });
     } catch (_) {}
   }
 
@@ -424,6 +485,8 @@ async function findDuplicates(srcItem) {
       console.log('TARGET KEY:', targetKey);
       console.log('TARGET NAME:', targetIt.name, 'TS:', targetIt.ts);
       console.log('GROUPS COUNT:', groups.length);
+
+      dupesPanel.hidden = true;
 
       if (!overlay.hidden) {
         overlay.hidden = true;
