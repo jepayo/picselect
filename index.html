@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Organizador por franjas</title>
   <link rel="stylesheet" href="styles.css" />
+  <script>if(localStorage.getItem('darkMode')==='1')document.documentElement.classList.add('dark');</script>
   <script src="https://unpkg.com/exifr/dist/full.umd.js"></script>
   <script src="https://unpkg.com/heic2any/dist/heic2any.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.js"></script>
@@ -38,12 +39,26 @@
             <span class="btn-count" id="countStar">0</span>
             <span class="btn-label">⭐ Mover a /selected</span>
           </button>
+          <button id="moveLow" disabled type="button">
+            <span class="btn-count" id="countLow">0</span>
+            <span class="btn-label">⚠️ Mover a /low</span>
+          </button>
+        </div>
+      </div>
+      <div class="ctrl-sep"></div>
+      <div class="ctrl-group">
+        <div class="ctrl-label">Filtrar vista</div>
+        <div class="ctrl-row">
+          <button id="filterAll" class="is-on" type="button">Ver todas</button>
+          <button id="filterNoGps" type="button">Sin GPS <span id="countNoGps" class="filter-count">0</span></button>
+          <button id="filterLowRes" type="button">Baja calidad <span id="countLowRes" class="filter-count">0</span></button>
         </div>
       </div>
       <div class="ctrl-sep"></div>
       <div class="ctrl-group ctrl-right">
         <div class="ctrl-label">&nbsp;</div>
         <div class="ctrl-row">
+          <button id="toggleDark" type="button">🌙 Oscuro</button>
           <button id="toggleManaged" class="is-on" type="button">👁 Mostrar gestionadas</button>
           <button id="toggleExpress" type="button">⚡ Modo express</button>
           <button id="pickDir" type="button">📁 Abrir carpeta</button>
@@ -84,6 +99,7 @@
   <template id="itemTpl">
     <figure class="item">
       <img loading="lazy" />
+      <div class="meta-flags"></div>
       <figcaption class="caption"></figcaption>
       <button class="mark btn-rotate" type="button" title="Rotar 90° derecha (J)">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -136,7 +152,17 @@
 
   <div id="photoViewer" class="viewer" hidden aria-hidden="true">
     <img id="viewerImg" alt="" />
-    <div id="viewerCaption" class="viewer-caption"></div>
+    <div id="viewerCaption" class="viewer-caption">
+      <div class="viewer-help">Espacio: volver · ←/→: cambiar · Z: estrella · X: papelera · I: ideas · R: papelera a no ⭐ · P: favorita a no categorizadas</div>
+      <div class="viewer-caption-row">
+        <span id="viewerFilename" class="viewer-filename"></span>
+        <span id="viewerFolder" class="viewer-folder"></span>
+        <span id="viewerCaptionMain"></span>
+        <button id="viewerCopyPath" class="viewer-copy-path" type="button" title="Copiar ruta al portapapeles">📋</button>
+      </div>
+      <span id="viewerGps" class="viewer-gps"></span>
+      <span id="viewerDims" class="viewer-dims"></span>
+    </div>
     <button id="viewerTrash" class="viewer-btn btn-trash" type="button" aria-pressed="false" title="Marcar para borrar (X)">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M3 6h18M9 6V4a2 2 0 012-2h2a2 2 0 012 2v2M19 6l-1 13a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m4 4v8m6-8v8"
@@ -155,7 +181,6 @@
               fill="currentColor"/>
       </svg>
     </button>
-    <div class="viewer-help">Espacio: volver · ←/→: cambiar · Z: estrella · X: papelera · I: ideas · R: papelera a no ⭐ · P: favorita a no categorizadas</div>
   </div>
 
   <!-- Panel duplicados flotante -->
